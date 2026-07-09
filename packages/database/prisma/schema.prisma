@@ -1,0 +1,307 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  STUDENT
+  SUPPORT
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum PlanType {
+  BASIC
+  INTERMEDIATE
+  PREMIUM
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+model Plan {
+  id          String    @id @default(uuid())
+  type        PlanType  @unique
+  name        String
+  tagline     String?
+  priceCents  Int
+  benefits    String    // JSON: string[]
+  highlight   Boolean   @default(false)
+  isActive    Boolean   @default(true)
+  order       Int       @default(0)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  @@index([isActive, order])
+}
+
+model User {
+  id              String    @id @default(uuid())
+  publicId        String    @unique // SIM-2026-0001
+  email           String    @unique
+  passwordHash    String?
+  name            String?
+  role            Role      @default(STUDENT)
+
+  // LGPD
+  acceptedTermsAt DateTime?
+
+  // Timestamps & Soft Delete
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  // Admin block (distinto de deletedAt / self-service LGPD)
+  blockedAt       DateTime?
+
+  // Avatar (path no bucket fotos-perfil, privado — signed URL na hora de exibir)
+  avatarPath      String?
+
+  // Relations
+  subscriptions   Subscription[]
+  progress        Progress[]
+  auditLogs       AuditLog[]
+  systemLogs      SystemLog[]
+  supportTickets  SupportTicket[]   @relation("ticket_user")
+  ticketMessages  TicketMessage[]   @relation("message_author")
+  certificates    Certificate[]
+  favorites       Favorite[]
+}
+
+model PublicIdCounter {
+  year       Int @id
+  lastNumber Int @default(0)
+}
+
+model TicketCounter {
+  year       Int @id
+  lastNumber Int @default(0)
+}
+
+model SupportTicket {
+  id        String          @id @default(uuid())
+  publicId  String          @unique  // TKT-2026-0001
+  userId    String
+  user      User            @relation("ticket_user", fields: [userId], references: [id])
+
+  subject   String
+  status    TicketStatus    @default(OPEN)
+  priority  TicketPriority  @default(NORMAL)
+
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  closedAt  DateTime?
+  deletedAt DateTime?
+
+  messages  TicketMessage[]
+
+  @@index([status, createdAt])
+  @@index([userId, status])
+}
+
+model TicketMessage {
+  id         String        @id @default(uuid())
+  ticketId   String
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  authorId   String
+  author     User          @relation("message_author", fields: [authorId], references: [id])
+
+  body       String
+  isInternal Boolean       @default(false)
+
+  createdAt  DateTime      @default(now())
+
+  @@index([ticketId, createdAt])
+}
+
+model Subscription {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planType    PlanType
+  isActive    Boolean   @default(true)
+  expiresAt   DateTime?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId, isActive])
+}
+
+model Course {
+  id          String    @id @default(uuid())
+  title       String
+  description String?
+  slug        String    @unique
+  thumbnail   String?
+  isArchived  Boolean   @default(false)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  modules      Module[]
+  certificates Certificate[]
+  materials    Material[]
+}
+
+model Material {
+  id           String    @id @default(uuid())
+  courseId     String
+  course       Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  title        String
+  description  String?
+  filename     String       // nome original preservado pra Content-Disposition
+  path         String       // path no bucket arquivos-alunos
+  sizeBytes    Int
+  mimeType     String
+  requiredPlan PlanType  @default(BASIC)
+  order        Int       @default(0)
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  @@index([courseId, order])
+}
+
+model Certificate {
+  id           String   @id @default(uuid())
+  publicCode   String   @unique  // CERT-2026-00001
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  courseId     String
+  course       Course   @relation(fields: [courseId], references: [id])
+
+  // Snapshots (imutáveis pós-emissão)
+  studentName  String
+  courseTitle  String
+
+  issuedAt     DateTime @default(now())
+
+  @@unique([userId, courseId])
+  @@index([publicCode])
+}
+
+model CertificateCounter {
+  year       Int @id
+  lastNumber Int @default(0)
+}
+
+model Module {
+  id          String    @id @default(uuid())
+  courseId    String
+  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  order       Int       @default(0)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  lessons     Lesson[]
+  favorites   Favorite[]
+
+  @@index([courseId, order])
+}
+
+model Lesson {
+  id          String    @id @default(uuid())
+  moduleId    String
+  module      Module    @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  videoUrl    String?
+  isProtected Boolean   @default(true)
+  order       Int       @default(0)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  progress    Progress[]
+  favorites   Favorite[]
+
+  @@index([moduleId, order])
+}
+
+model Favorite {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  lessonId  String?
+  lesson    Lesson?  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  moduleId  String?
+  module    Module?  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, lessonId])
+  @@unique([userId, moduleId])
+  @@index([userId, createdAt])
+}
+
+model Progress {
+  id              String    @id @default(uuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId        String
+  lesson          Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  
+  isCompleted     Boolean   @default(false)
+  completedAt     DateTime?
+  lastWatchedAt   DateTime  @default(now())
+
+  @@unique([userId, lessonId])
+}
+
+model AuditLog {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  action      String    // "course.create", "course.archive", "user.role_change"
+  details     String?   // JSON estruturado com contexto
+
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+}
+
+model SystemLog {
+  id          String    @id @default(uuid())
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id])
+  event       String    // "login_failure", "critical_error", "access_denied"
+  origin      String    // IP, "system" ou nome do serviço
+  description String?   // JSON estruturado com contexto
+
+  createdAt   DateTime  @default(now())
+
+  @@index([event, createdAt])
+  @@index([userId])
+}
