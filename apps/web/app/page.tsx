@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useRef } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -50,10 +51,13 @@ export default function Home() {
             <a href="#" className="hover:text-[var(--color-brand-gold)] transition-colors">Meus Cursos</a>
             <a href="#" className="hover:text-[var(--color-brand-gold)] transition-colors">Suporte</a>
           </nav>
-          <button className="bg-[var(--color-brand-charcoal)] text-white px-8 py-3 text-xs uppercase tracking-[0.15em] hover:bg-[var(--color-brand-sage)] transition-colors duration-500 flex items-center gap-2 group">
+          <Link
+            href="/login"
+            className="bg-[var(--color-brand-charcoal)] text-white px-8 py-3 text-xs uppercase tracking-[0.15em] hover:bg-[var(--color-brand-sage)] transition-colors duration-500 flex items-center gap-2 group"
+          >
             Área do Aluno
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-          </button>
+          </Link>
         </div>
       </header>
 
@@ -72,9 +76,12 @@ export default function Home() {
               O ecossistema definitivo para a sua jornada de organização. Acesse seus cursos, metodologias exclusivas e materiais complementares com a elegância que seu estilo de vida exige.
             </p>
             <div className="flex flex-col sm:flex-row gap-6 w-full justify-center relative z-10">
-              <button className="bg-[var(--color-brand-sage)] text-white px-10 py-5 text-xs font-semibold uppercase tracking-[0.2em] hover:bg-[var(--color-brand-charcoal)] transition-colors duration-500 shadow-xl shadow-[var(--color-brand-sage)]/20">
+              <Link
+                href="/signup"
+                className="bg-[var(--color-brand-sage)] text-white px-10 py-5 text-xs font-semibold uppercase tracking-[0.2em] hover:bg-[var(--color-brand-charcoal)] transition-colors duration-500 shadow-xl shadow-[var(--color-brand-sage)]/20 text-center"
+              >
                 Iniciar Jornada
-              </button>
+              </Link>
               <button className="bg-transparent text-[var(--color-brand-charcoal)] border border-[var(--color-brand-charcoal)]/30 px-10 py-5 text-xs font-semibold uppercase tracking-[0.2em] hover:border-[var(--color-brand-gold)] hover:text-[var(--color-brand-gold)] transition-colors duration-500 flex items-center justify-center gap-3">
                 <Play className="w-3 h-3" />
                 Assistir Trailer
