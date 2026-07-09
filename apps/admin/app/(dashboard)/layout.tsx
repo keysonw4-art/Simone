@@ -15,7 +15,13 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex min-h-screen bg-[var(--color-brand-offwhite)]">
-      <Sidebar user={session.user} />
+      <Sidebar
+        user={{
+          name: session.user.name,
+          email: session.user.email,
+          role: session.user.role,
+        }}
+      />
       <main className="flex-1 p-12 relative overflow-hidden">{children}</main>
     </div>
   );

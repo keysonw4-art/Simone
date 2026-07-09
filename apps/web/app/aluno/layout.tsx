@@ -12,7 +12,13 @@ export default async function AlunoLayout({
 
   return (
     <div className="min-h-screen flex flex-col bg-[var(--color-brand-offwhite)]">
-      <StudentHeader user={session.user} />
+      <StudentHeader
+        user={{
+          name: session.user.name,
+          email: session.user.email,
+          role: session.user.role,
+        }}
+      />
       <main className="flex-1">{children}</main>
     </div>
   );

@@ -1,10 +1,10 @@
 import NextAuth from "next-auth";
 import { authConfig } from "@repo/auth/config";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextMiddleware } from "next/server";
 
 const { auth } = NextAuth(authConfig);
 
-export default auth((req) => {
+const handler: NextMiddleware = auth((req) => {
   const isLoggedIn = !!req.auth;
   const role = req.auth?.user?.role;
   const pathname = req.nextUrl.pathname;
@@ -24,7 +24,9 @@ export default auth((req) => {
   }
 
   return NextResponse.next();
-});
+}) as unknown as NextMiddleware;
+
+export default handler;
 
 export const config = {
   matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
