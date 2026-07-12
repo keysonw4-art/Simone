@@ -233,7 +233,7 @@ model Lesson {
   module      Module    @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   title       String
   description String?
-  videoUrl    String?
+  vimeoVideoId String?    // apenas o ID numérico, ex: "824804225"
   isProtected Boolean   @default(true)
   order       Int       @default(0)
 

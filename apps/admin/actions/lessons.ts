@@ -10,11 +10,11 @@ import { logAuditEvent } from "../lib/audit";
 const LessonSchema = z.object({
   title: z.string().trim().min(2, "Título deve ter ao menos 2 caracteres").max(120),
   description: z.string().trim().max(2000).optional().or(z.literal("")),
-  videoUrl: z
+  vimeoVideoId: z
     .string()
     .trim()
-    .url("URL inválida")
-    .max(500)
+    .regex(/^\d+$/, "Cole apenas o ID numérico do Vimeo (ex: 824804225)")
+    .max(20)
     .optional()
     .or(z.literal("")),
   isProtected: z.preprocess(
@@ -23,12 +23,12 @@ const LessonSchema = z.object({
   ),
 });
 
-type FieldKey = "title" | "description" | "videoUrl" | "isProtected" | "form";
+type FieldKey = "title" | "description" | "vimeoVideoId" | "isProtected" | "form";
 type LessonFieldErrors = Partial<Record<FieldKey, string>>;
 type LessonValues = Partial<{
   title: string;
   description: string;
-  videoUrl: string;
+  vimeoVideoId: string;
   isProtected: boolean;
 }>;
 
@@ -49,7 +49,7 @@ function valuesFrom(formData: FormData): LessonValues {
   return {
     title: (formData.get("title") as string) ?? "",
     description: (formData.get("description") as string) ?? "",
-    videoUrl: (formData.get("videoUrl") as string) ?? "",
+    vimeoVideoId: (formData.get("vimeoVideoId") as string) ?? "",
     isProtected: formData.get("isProtected") === "on",
   };
 }
@@ -97,7 +97,7 @@ export async function createLessonAction(
   if (!parsed.success)
     return { errors: flattenZod(parsed.error), values: valuesFrom(formData) };
 
-  const { title, description, videoUrl, isProtected } = parsed.data;
+  const { title, description, vimeoVideoId, isProtected } = parsed.data;
 
   const last = await prisma.lesson.findFirst({
     where: { moduleId, deletedAt: null },
@@ -111,7 +111,7 @@ export async function createLessonAction(
       moduleId,
       title,
       description: description || null,
-      videoUrl: videoUrl || null,
+      vimeoVideoId: vimeoVideoId || null,
       isProtected,
       order,
     },
@@ -143,14 +143,14 @@ export async function updateLessonAction(
   if (!parsed.success)
     return { errors: flattenZod(parsed.error), values: valuesFrom(formData) };
 
-  const { title, description, videoUrl, isProtected } = parsed.data;
+  const { title, description, vimeoVideoId, isProtected } = parsed.data;
 
   await prisma.lesson.update({
     where: { id: lessonId },
     data: {
       title,
       description: description || null,
-      videoUrl: videoUrl || null,
+      vimeoVideoId: vimeoVideoId || null,
       isProtected,
     },
   });
@@ -166,7 +166,7 @@ export async function updateLessonAction(
 
   return {
     errors: {},
-    values: { title, description, videoUrl, isProtected },
+    values: { title, description, vimeoVideoId, isProtected },
   };
 }
 

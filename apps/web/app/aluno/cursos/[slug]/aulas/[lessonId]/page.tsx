@@ -5,6 +5,7 @@ import { ArrowLeft, PlayCircle, CheckCircle2 } from "lucide-react";
 import { requireLessonAccess } from "@/lib/subscriptionGuard";
 import { ProgressButton } from "@/components/ProgressButton";
 import { FavoriteToggleButton } from "@/components/FavoriteToggleButton";
+import { VimeoPlayer } from "@/components/VimeoPlayer";
 
 export default async function LessonPage({
   params,
@@ -59,11 +60,6 @@ export default async function LessonPage({
     select: { id: true },
   }));
 
-  // Renderiza o ID do vídeo do Vimeo a partir da URL ou exibe um iframe (depende do formato salvo, assumindo iframe src ou ID).
-  // Se for uma URL inteira do Vimeo, por segurança e simplicidade no MVP, vamos tentar embutir diretamente se não for vazia.
-  // No mundo ideal, seria extraído o ID e usado o https://player.vimeo.com/video/ID
-  const videoUrl = currentLesson.videoUrl || "";
-
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-[var(--color-brand-offwhite)] relative z-10">
       {/* Área Principal (Player de Vídeo) */}
@@ -76,23 +72,7 @@ export default async function LessonPage({
             <ArrowLeft className="w-3.5 h-3.5" /> Voltar para o Curso
           </Link>
 
-          <div className="aspect-video w-full bg-black rounded-lg overflow-hidden shadow-xl mb-8 border border-black/5 flex items-center justify-center relative">
-            {videoUrl ? (
-              <iframe
-                src={videoUrl.includes("vimeo.com") && !videoUrl.includes("player.vimeo.com") ? videoUrl.replace("vimeo.com", "player.vimeo.com/video") : videoUrl}
-                width="100%"
-                height="100%"
-                frameBorder="0"
-                allow="autoplay; fullscreen; picture-in-picture"
-                allowFullScreen
-                className="absolute top-0 left-0 w-full h-full"
-              ></iframe>
-            ) : (
-              <div className="text-[var(--color-brand-offwhite)]/50 font-serif text-lg">
-                Vídeo indisponível no momento
-              </div>
-            )}
-          </div>
+          <VimeoPlayer lessonId={currentLesson.id} />
 
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6 mb-12">
             <div>

@@ -16,7 +16,7 @@ type Props = {
     id: string;
     title: string;
     isProtected: boolean;
-    videoUrl: string | null;
+    vimeoVideoId: string | null;
   };
   isFirst: boolean;
   isLast: boolean;
@@ -59,9 +59,9 @@ export function LessonListItem({
         >
           {lesson.title}
         </Link>
-        {lesson.videoUrl && (
+        {lesson.vimeoVideoId && (
           <p className="text-[10px] text-[var(--color-brand-charcoal)]/50 mt-0.5 font-mono truncate">
-            {lesson.videoUrl}
+            vimeo:{lesson.vimeoVideoId}
           </p>
         )}
       </div>

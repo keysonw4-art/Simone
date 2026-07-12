@@ -22,7 +22,7 @@ export default async function EditarAulaPage({
       id: true,
       title: true,
       description: true,
-      videoUrl: true,
+      vimeoVideoId: true,
       isProtected: true,
       module: {
         select: {
@@ -70,7 +70,7 @@ export default async function EditarAulaPage({
         defaultValues={{
           title: lesson.title,
           description: lesson.description,
-          videoUrl: lesson.videoUrl,
+          vimeoVideoId: lesson.vimeoVideoId,
           isProtected: lesson.isProtected,
         }}
         submitLabel="Salvar Alterações"

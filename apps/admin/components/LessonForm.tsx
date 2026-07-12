@@ -25,7 +25,7 @@ type Props = {
   defaultValues?: {
     title?: string;
     description?: string | null;
-    videoUrl?: string | null;
+    vimeoVideoId?: string | null;
     isProtected?: boolean;
   };
   submitLabel: string;
@@ -91,21 +91,24 @@ export function LessonForm({
 
       <div className="flex flex-col gap-2">
         <label className="text-xs uppercase tracking-widest text-[var(--color-brand-charcoal)]/70 font-medium">
-          URL do vídeo
+          Vimeo Video ID
         </label>
         <input
-          type="url"
-          name="videoUrl"
-          defaultValue={defaultValues?.videoUrl ?? ""}
-          className="w-full bg-white border border-black/10 rounded-sm px-4 py-3 text-[var(--color-brand-charcoal)] focus:outline-none focus:border-[var(--color-brand-sage)] transition-colors"
-          placeholder="https://..."
+          type="text"
+          name="vimeoVideoId"
+          inputMode="numeric"
+          pattern="\d+"
+          defaultValue={defaultValues?.vimeoVideoId ?? ""}
+          className="w-full bg-white border border-black/10 rounded-sm px-4 py-3 text-[var(--color-brand-charcoal)] focus:outline-none focus:border-[var(--color-brand-sage)] transition-colors font-mono"
+          placeholder="824804225"
         />
-        <span className="text-[10px] text-[var(--color-brand-charcoal)]/50">
-          Integração com Vimeo (token signed URL) entra em fase posterior.
+        <span className="text-[10px] text-[var(--color-brand-charcoal)]/50 leading-relaxed">
+          Apenas o número do vídeo, sem <code>https://vimeo.com/</code>. Você
+          encontra na URL do seu vídeo: <code>vimeo.com/<strong>824804225</strong></code>.
         </span>
-        {errors?.videoUrl && (
+        {errors?.vimeoVideoId && (
           <span className="text-red-500 text-[10px] font-medium">
-            {errors.videoUrl}
+            {errors.vimeoVideoId}
           </span>
         )}
       </div>
