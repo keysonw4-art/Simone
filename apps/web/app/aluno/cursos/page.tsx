@@ -125,11 +125,11 @@ export default async function CursosIndexPage() {
   return (
     <div className="max-w-6xl mx-auto px-6 py-16 md:py-24 relative z-10">
       <header className="mb-12">
-        <p className="text-[10px] uppercase tracking-[0.3em] text-[var(--color-brand-gold)] mb-3 flex items-center gap-2">
+        <p className="text-[10px] uppercase tracking-[0.3em] text-[var(--color-brand-sage)] mb-3 flex items-center gap-2">
           <Sparkles className="w-3 h-3" /> Aulas de cortesia
         </p>
         <h1 className="font-serif text-4xl md:text-5xl text-[var(--color-brand-charcoal)] tracking-tight leading-[1.1] mb-4">
-          Uma amostra do <em className="text-[var(--color-brand-gold)] font-medium not-italic">método</em>.
+          Uma amostra do <em className="text-[var(--color-brand-sage)] font-medium not-italic">método</em>.
         </h1>
         <p className="text-base text-[var(--color-brand-charcoal)]/70 max-w-2xl font-light leading-relaxed">
           Você ainda não tem plano ativo. Estas aulas estão liberadas por
@@ -170,7 +170,7 @@ export default async function CursosIndexPage() {
                   <PlayCircle className="w-10 h-10 text-[var(--color-brand-charcoal)]/20" />
                 )}
                 <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors"></div>
-                <div className="absolute top-3 right-3 bg-[var(--color-brand-gold)]/95 text-white text-[9px] uppercase tracking-widest font-medium px-2 py-1 rounded-sm">
+                <div className="absolute top-3 right-3 bg-[var(--color-brand-sage)]/95 text-white text-[9px] uppercase tracking-widest font-medium px-2 py-1 rounded-sm">
                   Cortesia
                 </div>
               </div>

@@ -106,7 +106,7 @@ export default async function AlunoHomePage() {
           <div className="bg-white border border-black/5 rounded-lg p-8 md:p-10 shadow-sm md:col-span-2">
             <div className="flex items-start justify-between gap-6 flex-wrap mb-8">
               <div>
-                <p className="text-[10px] uppercase tracking-[0.3em] text-[var(--color-brand-gold)] mb-2 flex items-center gap-2">
+                <p className="text-[10px] uppercase tracking-[0.3em] text-[var(--color-brand-sage)] mb-2 flex items-center gap-2">
                   <Sparkles className="w-3 h-3" /> Aulas de cortesia
                 </p>
                 <h2 className="font-serif text-3xl text-[var(--color-brand-charcoal)] tracking-wide">
@@ -145,7 +145,7 @@ export default async function AlunoHomePage() {
                       <PlayCircle className="w-8 h-8 text-[var(--color-brand-charcoal)]/20" />
                     )}
                     <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors"></div>
-                    <div className="absolute top-2 right-2 bg-[var(--color-brand-gold)]/95 text-white text-[9px] uppercase tracking-widest font-medium px-2 py-0.5 rounded-sm">
+                    <div className="absolute top-2 right-2 bg-[var(--color-brand-sage)]/95 text-white text-[9px] uppercase tracking-widest font-medium px-2 py-0.5 rounded-sm">
                       Cortesia
                     </div>
                   </div>
