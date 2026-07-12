@@ -1,16 +1,20 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { ArrowRight, Play } from "lucide-react";
+import { TrailerModal } from "@/components/TrailerModal";
 
 gsap.registerPlugin(ScrollTrigger);
+
+const TRAILER_VIMEO_ID = process.env.NEXT_PUBLIC_TRAILER_VIMEO_ID;
 
 export default function Home() {
   const heroRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLHeadingElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+  const [trailerOpen, setTrailerOpen] = useState(false);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -82,10 +86,16 @@ export default function Home() {
               >
                 Iniciar Jornada
               </Link>
-              <button className="bg-transparent text-[var(--color-brand-charcoal)] border border-[var(--color-brand-charcoal)]/30 px-10 py-5 text-xs font-semibold uppercase tracking-[0.2em] hover:border-[var(--color-brand-gold)] hover:text-[var(--color-brand-gold)] transition-colors duration-500 flex items-center justify-center gap-3">
-                <Play className="w-3 h-3" />
-                Assistir Trailer
-              </button>
+              {TRAILER_VIMEO_ID && (
+                <button
+                  type="button"
+                  onClick={() => setTrailerOpen(true)}
+                  className="bg-transparent text-[var(--color-brand-charcoal)] border border-[var(--color-brand-charcoal)]/30 px-10 py-5 text-xs font-semibold uppercase tracking-[0.2em] hover:border-[var(--color-brand-gold)] hover:text-[var(--color-brand-gold)] transition-colors duration-500 flex items-center justify-center gap-3"
+                >
+                  <Play className="w-3 h-3" />
+                  Assistir Trailer
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -95,6 +105,13 @@ export default function Home() {
       <div className="h-[50vh] flex items-center justify-center text-[var(--color-brand-charcoal)]/30 font-serif">
         Scroll suave ativado
       </div>
+
+      {trailerOpen && TRAILER_VIMEO_ID && (
+        <TrailerModal
+          vimeoVideoId={TRAILER_VIMEO_ID}
+          onClose={() => setTrailerOpen(false)}
+        />
+      )}
     </div>
   );
 }
