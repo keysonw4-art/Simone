@@ -196,28 +196,28 @@ export default async function CursosIndexPage() {
         </div>
       )}
 
-      <div className="bg-[var(--color-brand-charcoal)] text-white rounded-lg overflow-hidden shadow-xl relative">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-[var(--color-brand-gold)]/20 rounded-full blur-[100px] translate-x-1/3 -translate-y-1/3"></div>
-        <div className="relative p-10 md:p-14 flex flex-col md:flex-row items-start md:items-center gap-8 justify-between">
+      <div className="bg-white border border-black/5 rounded-lg overflow-hidden shadow-sm relative">
+        <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-[var(--color-brand-sage)] via-[var(--color-brand-gold)] to-[var(--color-brand-sage)]"></div>
+        <div className="p-10 md:p-14 flex flex-col md:flex-row items-start md:items-center gap-8 justify-between">
           <div className="flex-1">
-            <p className="text-[10px] uppercase tracking-[0.3em] text-[var(--color-brand-gold)] mb-3">
+            <p className="text-[10px] uppercase tracking-[0.3em] text-[var(--color-brand-charcoal)]/50 mb-3">
               Pronto para ir mais fundo?
             </p>
-            <h2 className="font-serif text-3xl md:text-4xl mb-3 tracking-tight leading-tight">
+            <h2 className="font-serif text-3xl md:text-4xl text-[var(--color-brand-charcoal)] mb-3 tracking-tight leading-tight">
               Gostou do conteúdo?
               <br />
-              <em className="text-[var(--color-brand-gold)] font-medium not-italic">
+              <em className="text-[var(--color-brand-sage)] font-medium not-italic">
                 Assine já.
               </em>
             </h2>
-            <p className="text-sm text-white/60 max-w-lg font-light leading-relaxed">
+            <p className="text-sm text-[var(--color-brand-charcoal)]/60 max-w-lg font-light leading-relaxed">
               Todos os cursos, materiais e aulas exclusivas ficam disponíveis
               assim que sua assinatura estiver ativa.
             </p>
           </div>
           <Link
             href="/planos"
-            className="bg-[var(--color-brand-gold)] text-[var(--color-brand-charcoal)] px-8 py-5 text-xs font-semibold uppercase tracking-[0.2em] hover:bg-white transition-colors duration-500 whitespace-nowrap flex items-center gap-3 group"
+            className="bg-[var(--color-brand-sage)] text-white px-8 py-5 text-xs font-semibold uppercase tracking-[0.2em] hover:bg-[var(--color-brand-charcoal)] transition-colors duration-500 whitespace-nowrap flex items-center gap-3 group shadow-xl shadow-[var(--color-brand-sage)]/20"
           >
             Ver planos{" "}
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
