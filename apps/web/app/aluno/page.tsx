@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { auth } from "@repo/auth";
 import { prisma } from "@repo/database";
-import { ArrowRight, PlayCircle, BookOpen } from "lucide-react";
+import { ArrowRight, PlayCircle, BookOpen, Sparkles } from "lucide-react";
 
 export default async function AlunoHomePage() {
   const session = await auth();
@@ -33,6 +33,38 @@ export default async function AlunoHomePage() {
       })
     : [];
 
+  // Sem assinatura: mostra amostra de até 3 aulas de cortesia no dashboard
+  const previewLessons = hasActiveSubscription
+    ? []
+    : await prisma.lesson.findMany({
+        where: {
+          isProtected: false,
+          deletedAt: null,
+          module: {
+            deletedAt: null,
+            course: { isArchived: false, deletedAt: null },
+          },
+        },
+        orderBy: [
+          { module: { course: { createdAt: "asc" } } },
+          { module: { order: "asc" } },
+          { order: "asc" },
+        ],
+        take: 3,
+        select: {
+          id: true,
+          title: true,
+          module: {
+            select: {
+              title: true,
+              course: {
+                select: { title: true, slug: true, thumbnail: true },
+              },
+            },
+          },
+        },
+      });
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-16 md:py-24 relative z-10">
       <header className="mb-16">
@@ -49,7 +81,7 @@ export default async function AlunoHomePage() {
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-        {!hasActiveSubscription && (
+        {!hasActiveSubscription && previewLessons.length === 0 && (
           <div className="bg-white border border-black/5 rounded-lg p-10 shadow-sm md:col-span-2 flex flex-col items-center text-center">
             <div className="w-16 h-16 border border-[var(--color-brand-sage)]/30 flex items-center justify-center mb-6 text-[var(--color-brand-sage)] rounded-sm">
               <PlayCircle className="w-6 h-6" />
@@ -66,6 +98,79 @@ export default async function AlunoHomePage() {
               className="bg-[var(--color-brand-sage)] text-white px-8 py-4 text-xs font-semibold uppercase tracking-[0.2em] hover:bg-[var(--color-brand-charcoal)] transition-colors duration-500 shadow-xl shadow-[var(--color-brand-sage)]/20"
             >
               Conhecer os planos
+            </Link>
+          </div>
+        )}
+
+        {!hasActiveSubscription && previewLessons.length > 0 && (
+          <div className="bg-white border border-black/5 rounded-lg p-8 md:p-10 shadow-sm md:col-span-2">
+            <div className="flex items-start justify-between gap-6 flex-wrap mb-8">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.3em] text-[var(--color-brand-gold)] mb-2 flex items-center gap-2">
+                  <Sparkles className="w-3 h-3" /> Aulas de cortesia
+                </p>
+                <h2 className="font-serif text-3xl text-[var(--color-brand-charcoal)] tracking-wide">
+                  Uma amostra do método
+                </h2>
+                <p className="text-sm text-[var(--color-brand-charcoal)]/60 mt-2 max-w-lg leading-relaxed">
+                  Você ainda não tem plano. Estas aulas estão liberadas para
+                  você experimentar.
+                </p>
+              </div>
+              <Link
+                href="/planos"
+                className="bg-[var(--color-brand-sage)] text-white px-6 py-3 text-[10px] font-semibold uppercase tracking-[0.2em] hover:bg-[var(--color-brand-charcoal)] transition-colors duration-500 flex items-center gap-2 group whitespace-nowrap"
+              >
+                Ver planos
+                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {previewLessons.map((lesson) => (
+                <Link
+                  key={lesson.id}
+                  href={`/aluno/cursos/${lesson.module.course.slug}/aulas/${lesson.id}`}
+                  className="group border border-black/5 rounded-sm overflow-hidden hover:shadow-md hover:border-[var(--color-brand-sage)]/20 transition-all duration-300 flex flex-col"
+                >
+                  <div className="w-full h-28 bg-[var(--color-brand-charcoal)]/5 flex items-center justify-center relative overflow-hidden">
+                    {lesson.module.course.thumbnail ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={lesson.module.course.thumbnail}
+                        alt={lesson.module.course.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                      />
+                    ) : (
+                      <PlayCircle className="w-8 h-8 text-[var(--color-brand-charcoal)]/20" />
+                    )}
+                    <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors"></div>
+                    <div className="absolute top-2 right-2 bg-[var(--color-brand-gold)]/95 text-white text-[9px] uppercase tracking-widest font-medium px-2 py-0.5 rounded-sm">
+                      Cortesia
+                    </div>
+                  </div>
+                  <div className="p-4 flex-1 flex flex-col">
+                    <div className="text-[9px] uppercase tracking-widest text-[var(--color-brand-charcoal)]/40 mb-1 truncate">
+                      {lesson.module.course.title}
+                    </div>
+                    <h3 className="font-serif text-base text-[var(--color-brand-charcoal)] group-hover:text-[var(--color-brand-sage)] transition-colors line-clamp-2 leading-tight">
+                      {lesson.title}
+                    </h3>
+                    <div className="mt-3 text-[10px] uppercase tracking-widest text-[var(--color-brand-sage)] font-medium flex items-center gap-1">
+                      Assistir{" "}
+                      <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+
+            <Link
+              href="/aluno/cursos"
+              className="inline-flex items-center gap-2 mt-8 text-[10px] uppercase tracking-widest text-[var(--color-brand-charcoal)]/60 hover:text-[var(--color-brand-sage)] transition-colors"
+            >
+              Ver todas as aulas de cortesia
+              <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
         )}
