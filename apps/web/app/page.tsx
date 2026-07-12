@@ -51,9 +51,24 @@ export default function Home() {
             </div>
           </div>
           <nav className="hidden md:flex items-center gap-10 text-xs uppercase font-medium tracking-[0.15em] text-[var(--color-brand-charcoal)]/70">
-            <a href="#" className="hover:text-[var(--color-brand-gold)] transition-colors">Método</a>
-            <a href="#" className="hover:text-[var(--color-brand-gold)] transition-colors">Meus Cursos</a>
-            <a href="#" className="hover:text-[var(--color-brand-gold)] transition-colors">Suporte</a>
+            <span
+              className="text-[var(--color-brand-charcoal)]/30 cursor-not-allowed"
+              title="Em breve"
+            >
+              Método
+            </span>
+            <Link
+              href="/aluno/cursos"
+              className="hover:text-[var(--color-brand-gold)] transition-colors"
+            >
+              Meus Cursos
+            </Link>
+            <Link
+              href="/aluno/suporte"
+              className="hover:text-[var(--color-brand-gold)] transition-colors"
+            >
+              Suporte
+            </Link>
           </nav>
           <Link
             href="/login"
