@@ -1,24 +1,41 @@
 import Link from "next/link";
 import { auth } from "@repo/auth";
 import { prisma } from "@repo/database";
-import { ArrowRight, PlayCircle, BookOpen, Sparkles } from "lucide-react";
+import { ArrowRight, PlayCircle, BookOpen, Sparkles, CreditCard } from "lucide-react";
+import { TIER_LABELS } from "@/lib/planTiers";
+import { openBillingPortalAction } from "@/actions/billing";
+
+function formatDate(d: Date): string {
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" }).format(d);
+}
 
 export default async function AlunoHomePage() {
   const session = await auth();
   const firstName =
     session?.user?.name?.trim().split(" ")[0] ?? "aluno(a)";
 
-  // Verifica se o aluno possui alguma assinatura ativa
-  const hasActiveSubscription =
-    session?.user?.role === "ADMIN" || session?.user?.role === "SUPER_ADMIN"
-      ? true
-      : await prisma.subscription.findFirst({
-          where: {
-            userId: session?.user?.id,
-            isActive: true,
-            OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-          },
-        });
+  const isStaff =
+    session?.user?.role === "ADMIN" || session?.user?.role === "SUPER_ADMIN";
+
+  // Assinatura ativa (registro completo, pra exibir plano/renovação/portal)
+  const activeSub = isStaff
+    ? null
+    : await prisma.subscription.findFirst({
+        where: {
+          userId: session?.user?.id,
+          isActive: true,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
+        orderBy: { createdAt: "desc" },
+        select: {
+          planType: true,
+          currentPeriodEnd: true,
+          cancelAtPeriodEnd: true,
+          stripeSubscriptionId: true,
+        },
+      });
+
+  const hasActiveSubscription = isStaff || !!activeSub;
 
   // Se tiver assinatura ativa, busca os cursos disponíveis
   const courses = hasActiveSubscription
@@ -188,11 +205,36 @@ export default async function AlunoHomePage() {
               {session?.user?.email}
             </span>
           </p>
-          <p className="text-xs text-[var(--color-brand-charcoal)]/50 mt-4 leading-relaxed">
-            Em breve você poderá editar perfil, alterar senha e gerenciar
-            assinatura por aqui.
-          </p>
-          <div className="flex flex-col gap-2 mt-6">
+
+          {activeSub && (
+            <div className="mt-4 pt-4 border-t border-black/5">
+              <p className="text-sm text-[var(--color-brand-charcoal)]/60 leading-relaxed">
+                Plano:{" "}
+                <span className="text-[var(--color-brand-charcoal)] font-medium">
+                  {TIER_LABELS[activeSub.planType]}
+                </span>
+              </p>
+              {activeSub.currentPeriodEnd && (
+                <p className="text-xs text-[var(--color-brand-charcoal)]/50 mt-1">
+                  {activeSub.cancelAtPeriodEnd
+                    ? `Acesso até ${formatDate(activeSub.currentPeriodEnd)} (cancelamento agendado)`
+                    : `Renova em ${formatDate(activeSub.currentPeriodEnd)}`}
+                </p>
+              )}
+              {activeSub.stripeSubscriptionId && (
+                <form action={openBillingPortalAction} className="mt-4">
+                  <button
+                    type="submit"
+                    className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-[var(--color-brand-sage)] hover:text-[var(--color-brand-charcoal)] transition-colors"
+                  >
+                    <CreditCard className="w-3.5 h-3.5" /> Gerenciar assinatura
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
+
+          <div className="flex flex-col gap-2 mt-6 pt-4 border-t border-black/5">
             <Link
               href="/aluno/suporte"
               className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-[var(--color-brand-sage)] hover:text-[var(--color-brand-charcoal)] transition-colors"

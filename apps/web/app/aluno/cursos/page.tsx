@@ -1,10 +1,17 @@
 import Link from "next/link";
+import { CheckCircle2 } from "lucide-react";
 import { prisma } from "@repo/database";
 import { ArrowRight, BookOpen, PlayCircle, Sparkles } from "lucide-react";
 import { requireSession } from "@/lib/subscriptionGuard";
+import { PaymentConfirming } from "@/components/PaymentConfirming";
 
-export default async function CursosIndexPage() {
-  const user = await requireSession();
+export default async function CursosIndexPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ assinatura?: string }>;
+}) {
+  const [user, sp] = await Promise.all([requireSession(), searchParams]);
+  const justSubscribed = sp?.assinatura === "sucesso";
 
   const isStaff = user.role === "ADMIN" || user.role === "SUPER_ADMIN";
 
@@ -28,6 +35,20 @@ export default async function CursosIndexPage() {
 
     return (
       <div className="max-w-7xl mx-auto px-6 py-16 md:py-24 relative z-10">
+        {justSubscribed && (
+          <div className="max-w-2xl mb-10 rounded-sm border border-[var(--color-brand-sage)]/30 bg-[var(--color-brand-sage)]/5 px-6 py-5 flex items-start gap-3">
+            <CheckCircle2 className="w-5 h-5 text-[var(--color-brand-sage)] flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-[var(--color-brand-charcoal)]">
+                Assinatura confirmada. Boas-vindas.
+              </p>
+              <p className="text-xs text-[var(--color-brand-charcoal)]/60 mt-0.5">
+                Todo o conteúdo já está liberado abaixo.
+              </p>
+            </div>
+          </div>
+        )}
+
         <header className="mb-12">
           <p className="text-[10px] uppercase tracking-[0.3em] text-[var(--color-brand-charcoal)]/60 mb-3">
             Meus Cursos
@@ -124,6 +145,8 @@ export default async function CursosIndexPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-16 md:py-24 relative z-10">
+      {justSubscribed && <PaymentConfirming />}
+
       <header className="mb-12">
         <p className="text-[10px] uppercase tracking-[0.3em] text-[var(--color-brand-sage)] mb-3 flex items-center gap-2">
           <Sparkles className="w-3 h-3" /> Aulas de cortesia
