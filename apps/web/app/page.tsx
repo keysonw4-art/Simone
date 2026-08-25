@@ -1,68 +1,101 @@
-"use client";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { ArrowRight, Play } from "lucide-react";
-import { TrailerModal } from "@/components/TrailerModal";
+import { prisma } from "@repo/database";
+import { ArrowRight, Compass, LayoutGrid, Repeat } from "lucide-react";
+import { LandingHero } from "@/components/landing/LandingHero";
+import { Reveal } from "@/components/landing/Reveal";
 
-gsap.registerPlugin(ScrollTrigger);
+function formatBRL(cents: number): string {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(cents / 100);
+}
 
-const TRAILER_VIMEO_ID = process.env.NEXT_PUBLIC_TRAILER_VIMEO_ID;
+const PILLARS = [
+  {
+    icon: Compass,
+    title: "Clareza",
+    body: "Entender o que fica, o que sai e por quê. A decisão vem antes da caixa organizadora.",
+  },
+  {
+    icon: LayoutGrid,
+    title: "Sistema",
+    body: "Cada coisa em um lugar que faz sentido para você e que é fácil de manter no dia a dia.",
+  },
+  {
+    icon: Repeat,
+    title: "Permanência",
+    body: "Hábitos simples para que a ordem dure muito depois da primeira arrumação.",
+  },
+];
 
-export default function Home() {
-  const heroRef = useRef<HTMLDivElement>(null);
-  const textRef = useRef<HTMLHeadingElement>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
-  const [trailerOpen, setTrailerOpen] = useState(false);
+const STEPS = [
+  {
+    n: "01",
+    title: "Assine",
+    body: "Escolha o plano que combina com o seu momento.",
+  },
+  {
+    n: "02",
+    title: "Acesse",
+    body: "Cursos, aulas e materiais liberados na sua área, quando quiser.",
+  },
+  {
+    n: "03",
+    title: "Transforme",
+    body: "Aplique no seu ritmo e veja a mudança acontecer, ambiente por ambiente.",
+  },
+];
 
-  useEffect(() => {
-    const ctx = gsap.context(() => {
-      // Hero reveal
-      gsap.fromTo(textRef.current, 
-        { y: 50, opacity: 0 }, 
-        { y: 0, opacity: 1, duration: 1.2, ease: "power3.out", delay: 0.2 }
-      );
-      
-      gsap.fromTo(cardRef.current,
-        { y: 100, opacity: 0, scale: 0.95 },
-        { y: 0, opacity: 1, scale: 1, duration: 1.5, ease: "power3.out", delay: 0.4 }
-      );
-    }, heroRef);
-    
-    return () => ctx.revert();
-  }, []);
+export default async function Home() {
+  const plans = await prisma.plan.findMany({
+    where: { isActive: true, deletedAt: null },
+    orderBy: { order: "asc" },
+    select: {
+      id: true,
+      name: true,
+      tagline: true,
+      priceCents: true,
+      highlight: true,
+    },
+  });
 
   return (
-    <div className="flex flex-col min-h-screen relative overflow-hidden" ref={heroRef}>
-      {/* Background with subtle gradient/blur */}
-      <div className="absolute inset-0 bg-[var(--color-brand-offwhite)] z-[-2]"></div>
-      <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-[var(--color-brand-gold)]/5 rounded-full blur-[120px] z-[-1] translate-x-1/3 -translate-y-1/3"></div>
-      <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-[var(--color-brand-sage)]/5 rounded-full blur-[100px] z-[-1] -translate-x-1/4 translate-y-1/4"></div>
+    <div className="relative overflow-hidden">
+      {/* Fundo — halos suaves da identidade */}
+      <div className="absolute inset-0 bg-[var(--color-brand-offwhite)] -z-20" />
+      <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-[var(--color-brand-gold)]/5 rounded-full blur-[120px] -z-10 translate-x-1/3 -translate-y-1/3" />
+      <div className="absolute top-[60vh] left-0 w-[600px] h-[600px] bg-[var(--color-brand-sage)]/5 rounded-full blur-[100px] -z-10 -translate-x-1/4" />
 
-      {/* Header Glassmorphism */}
-      <header className="w-full fixed top-0 z-50 backdrop-blur-xl bg-[var(--color-brand-offwhite)]/60 border-b border-[var(--color-brand-gold)]/10">
-        <div className="max-w-7xl mx-auto px-6 h-24 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 border border-[var(--color-brand-gold)]/50 flex items-center justify-center text-[var(--color-brand-gold)] font-serif text-xl tracking-tighter">SM</div>
-            <div className="flex flex-col">
-              <span className="font-serif text-xl text-[var(--color-brand-charcoal)] tracking-widest leading-none">SIMONE MENDES</span>
-              <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-brand-charcoal)]/60 mt-1">Organizer Premium</span>
+      {/* Header */}
+      <header className="w-full fixed top-0 z-50 backdrop-blur-md bg-[var(--color-brand-offwhite)]/70 border-b border-black/5">
+        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-3">
+            <div className="w-11 h-11 border border-[var(--color-brand-gold)]/50 flex items-center justify-center text-[var(--color-brand-gold)] font-serif text-lg">
+              SM
             </div>
-          </div>
+            <div className="flex flex-col">
+              <span className="font-serif text-lg text-[var(--color-brand-charcoal)] tracking-widest leading-none">
+                SIMONE MENDES
+              </span>
+              <span className="text-[9px] uppercase tracking-[0.2em] text-[var(--color-brand-charcoal)]/60 mt-1">
+                Organizer Premium
+              </span>
+            </div>
+          </Link>
           <nav className="hidden md:flex items-center gap-10 text-xs uppercase font-medium tracking-[0.15em] text-[var(--color-brand-charcoal)]/70">
-            <span
-              className="text-[var(--color-brand-charcoal)]/30 cursor-not-allowed"
-              title="Em breve"
-            >
-              Método
-            </span>
-            <Link
-              href="/aluno/cursos"
+            <a
+              href="#metodo"
               className="hover:text-[var(--color-brand-gold)] transition-colors"
             >
-              Meus Cursos
-            </Link>
+              Método
+            </a>
+            <a
+              href="#planos"
+              className="hover:text-[var(--color-brand-gold)] transition-colors"
+            >
+              Planos
+            </a>
             <Link
               href="/aluno/suporte"
               className="hover:text-[var(--color-brand-gold)] transition-colors"
@@ -72,7 +105,7 @@ export default function Home() {
           </nav>
           <Link
             href="/login"
-            className="bg-[var(--color-brand-charcoal)] text-white px-8 py-3 text-xs uppercase tracking-[0.15em] hover:bg-[var(--color-brand-sage)] transition-colors duration-500 flex items-center gap-2 group"
+            className="bg-[var(--color-brand-charcoal)] text-white px-6 py-3 text-xs uppercase tracking-[0.15em] rounded-sm hover:bg-[var(--color-brand-sage)] transition-colors duration-500 flex items-center gap-2 group"
           >
             Área do Aluno
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -80,53 +113,206 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Hero Section */}
-      <main className="flex-1 flex flex-col items-center justify-center px-6 pt-40 pb-24 text-center relative z-10">
-        <h1 ref={textRef} className="font-serif text-5xl md:text-7xl lg:text-[5.5rem] text-[var(--color-brand-charcoal)] mb-8 leading-[1.1] max-w-5xl opacity-0">
-          Transformando <i className="text-[var(--color-brand-gold)]">Espaços</i>,<br /> Restaurando a Paz.
-        </h1>
-        
-        {/* Glass Card central */}
-        <div ref={cardRef} className="mt-12 w-full max-w-4xl backdrop-blur-md bg-white/40 border border-white/60 shadow-2xl rounded-sm p-1 opacity-0">
-          <div className="border border-[var(--color-brand-gold)]/20 p-10 md:p-16 flex flex-col items-center bg-white/30 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--color-brand-gold)]/10 blur-[40px]"></div>
-            
-            <p className="text-lg md:text-xl text-[var(--color-brand-charcoal)]/80 max-w-2xl mb-12 font-light leading-relaxed">
-              O ecossistema definitivo para a sua jornada de organização. Acesse seus cursos, metodologias exclusivas e materiais complementares com a elegância que seu estilo de vida exige.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-6 w-full justify-center relative z-10">
-              <Link
-                href="/signup"
-                className="bg-[var(--color-brand-sage)] text-white px-10 py-5 text-xs font-semibold uppercase tracking-[0.2em] hover:bg-[var(--color-brand-charcoal)] transition-colors duration-500 shadow-xl shadow-[var(--color-brand-sage)]/20 text-center"
-              >
-                Iniciar Jornada
-              </Link>
-              {TRAILER_VIMEO_ID && (
-                <button
-                  type="button"
-                  onClick={() => setTrailerOpen(true)}
-                  className="bg-transparent text-[var(--color-brand-charcoal)] border border-[var(--color-brand-charcoal)]/30 px-10 py-5 text-xs font-semibold uppercase tracking-[0.2em] hover:border-[var(--color-brand-gold)] hover:text-[var(--color-brand-gold)] transition-colors duration-500 flex items-center justify-center gap-3"
-                >
-                  <Play className="w-3 h-3" />
-                  Assistir Trailer
-                </button>
-              )}
-            </div>
+      <LandingHero />
+
+      {/* Método */}
+      <section
+        id="metodo"
+        className="relative z-10 max-w-6xl mx-auto px-6 py-24 md:py-32 scroll-mt-24"
+      >
+        <Reveal className="max-w-2xl mb-16">
+          <p className="text-[11px] uppercase tracking-[0.3em] text-[var(--color-brand-sage)] mb-4">
+            O Método
+          </p>
+          <h2 className="font-serif text-4xl md:text-5xl text-[var(--color-brand-charcoal)] tracking-tight leading-[1.1] mb-6">
+            Organização como um ato de cuidado.
+          </h2>
+          <p className="text-base md:text-lg text-[var(--color-brand-charcoal)]/70 font-light leading-relaxed">
+            Mais do que arrumar, é criar sistemas que cabem na sua rotina e
+            permanecem. Uma casa em ordem para uma vida mais leve.
+          </p>
+        </Reveal>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-black/5 border border-black/5 rounded-sm overflow-hidden">
+          {PILLARS.map((p, i) => (
+            <Reveal key={p.title} delay={i * 80}>
+              <div className="bg-[var(--color-brand-offwhite)] h-full p-8 md:p-10">
+                <p.icon
+                  className="w-6 h-6 text-[var(--color-brand-sage)] mb-6"
+                  strokeWidth={1.5}
+                />
+                <h3 className="font-serif text-2xl text-[var(--color-brand-charcoal)] mb-3">
+                  {p.title}
+                </h3>
+                <p className="text-sm text-[var(--color-brand-charcoal)]/65 leading-relaxed">
+                  {p.body}
+                </p>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      {/* Como funciona */}
+      <section className="relative z-10 bg-white border-y border-black/5">
+        <div className="max-w-6xl mx-auto px-6 py-24 md:py-32">
+          <Reveal>
+            <h2 className="font-serif text-4xl md:text-5xl text-[var(--color-brand-charcoal)] tracking-tight leading-[1.1] mb-16 max-w-xl">
+              Do primeiro acesso à casa transformada.
+            </h2>
+          </Reveal>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-16">
+            {STEPS.map((s, i) => (
+              <Reveal key={s.n} delay={i * 80}>
+                <div className="flex flex-col">
+                  <span className="font-serif text-5xl text-[var(--color-brand-gold)]/30 mb-5 leading-none">
+                    {s.n}
+                  </span>
+                  <h3 className="font-serif text-2xl text-[var(--color-brand-charcoal)] mb-3">
+                    {s.title}
+                  </h3>
+                  <p className="text-sm text-[var(--color-brand-charcoal)]/65 leading-relaxed">
+                    {s.body}
+                  </p>
+                </div>
+              </Reveal>
+            ))}
           </div>
         </div>
-      </main>
-      
-      {/* Spacer para mostrar o Lenis Smooth Scroll funcionando */}
-      <div className="h-[50vh] flex items-center justify-center text-[var(--color-brand-charcoal)]/30 font-serif">
-        Scroll suave ativado
-      </div>
+      </section>
 
-      {trailerOpen && TRAILER_VIMEO_ID && (
-        <TrailerModal
-          vimeoVideoId={TRAILER_VIMEO_ID}
-          onClose={() => setTrailerOpen(false)}
-        />
+      {/* Planos */}
+      {plans.length > 0 && (
+        <section
+          id="planos"
+          className="relative z-10 max-w-6xl mx-auto px-6 py-24 md:py-32 scroll-mt-24"
+        >
+          <Reveal className="max-w-2xl mb-16">
+            <h2 className="font-serif text-4xl md:text-5xl text-[var(--color-brand-charcoal)] tracking-tight leading-[1.1] mb-6">
+              Um plano para cada momento.
+            </h2>
+            <p className="text-base text-[var(--color-brand-charcoal)]/70 font-light leading-relaxed">
+              Comece quando quiser, cancele quando precisar. Todo o conteúdo na
+              sua área de aluno.
+            </p>
+          </Reveal>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {plans.map((plan, i) => (
+              <Reveal key={plan.id} delay={i * 80} className="h-full">
+                <div
+                  className={`h-full bg-white rounded-sm flex flex-col p-8 ${
+                    plan.highlight
+                      ? "border-2 border-[var(--color-brand-gold)] shadow-lg"
+                      : "border border-black/5 shadow-sm"
+                  }`}
+                >
+                  {plan.highlight && (
+                    <span className="self-start text-[10px] uppercase tracking-widest text-[var(--color-brand-gold)] font-medium mb-4">
+                      Recomendado
+                    </span>
+                  )}
+                  <h3 className="font-serif text-2xl text-[var(--color-brand-charcoal)] mb-1">
+                    {plan.name}
+                  </h3>
+                  {plan.tagline && (
+                    <p className="text-xs uppercase tracking-widest text-[var(--color-brand-charcoal)]/50 mb-6">
+                      {plan.tagline}
+                    </p>
+                  )}
+                  <div className="flex items-baseline gap-1.5 mb-8">
+                    <span className="font-serif text-4xl text-[var(--color-brand-charcoal)]">
+                      {formatBRL(plan.priceCents)}
+                    </span>
+                    <span className="text-xs uppercase tracking-widest text-[var(--color-brand-charcoal)]/50">
+                      / mês
+                    </span>
+                  </div>
+                  <Link
+                    href="/planos"
+                    className={`mt-auto block text-center px-6 py-3.5 text-xs font-semibold uppercase tracking-[0.2em] rounded-sm transition-colors ${
+                      plan.highlight
+                        ? "bg-[var(--color-brand-gold)] text-white hover:bg-[var(--color-brand-charcoal)]"
+                        : "bg-[var(--color-brand-sage)] text-white hover:bg-[var(--color-brand-charcoal)]"
+                    }`}
+                  >
+                    Ver detalhes
+                  </Link>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+
+          <Reveal className="mt-10">
+            <Link
+              href="/planos"
+              className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-[var(--color-brand-charcoal)]/60 hover:text-[var(--color-brand-sage)] transition-colors"
+            >
+              Comparar todos os planos
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </Reveal>
+        </section>
       )}
+
+      {/* CTA final */}
+      <section className="relative z-10 bg-[var(--color-brand-sage)] text-white">
+        <div className="max-w-4xl mx-auto px-6 py-24 md:py-32 text-center">
+          <Reveal>
+            <h2 className="font-serif text-4xl md:text-5xl tracking-tight leading-[1.1] mb-6">
+              Comece a sua jornada de organização.
+            </h2>
+            <p className="text-base md:text-lg text-white/70 font-light leading-relaxed max-w-xl mx-auto mb-10">
+              Crie sua conta e dê o primeiro passo para uma casa mais leve, no
+              seu tempo.
+            </p>
+            <Link
+              href="/signup"
+              className="inline-flex items-center gap-3 bg-white text-[var(--color-brand-sage)] px-10 py-4 text-xs font-semibold uppercase tracking-[0.2em] rounded-sm hover:bg-[var(--color-brand-offwhite)] transition-colors duration-500 group"
+            >
+              Iniciar Jornada
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </Link>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="relative z-10 bg-[var(--color-brand-offwhite)] border-t border-black/5">
+        <div className="max-w-7xl mx-auto px-6 py-14 flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
+          <div>
+            <span className="font-serif text-lg text-[var(--color-brand-charcoal)] tracking-widest">
+              SIMONE MENDES
+            </span>
+            <p className="text-xs text-[var(--color-brand-charcoal)]/50 mt-2 max-w-xs leading-relaxed">
+              Educação em organização para uma vida com mais leveza.
+            </p>
+          </div>
+          <nav className="flex flex-wrap gap-x-8 gap-y-3 text-xs uppercase tracking-widest text-[var(--color-brand-charcoal)]/60">
+            <a href="#metodo" className="hover:text-[var(--color-brand-sage)] transition-colors">
+              Método
+            </a>
+            <a href="#planos" className="hover:text-[var(--color-brand-sage)] transition-colors">
+              Planos
+            </a>
+            <Link href="/login" className="hover:text-[var(--color-brand-sage)] transition-colors">
+              Área do Aluno
+            </Link>
+            <Link href="/termos" className="hover:text-[var(--color-brand-sage)] transition-colors">
+              Termos
+            </Link>
+            <Link href="/privacidade" className="hover:text-[var(--color-brand-sage)] transition-colors">
+              Privacidade
+            </Link>
+          </nav>
+        </div>
+        <div className="max-w-7xl mx-auto px-6 pb-10">
+          <p className="text-[11px] text-[var(--color-brand-charcoal)]/40">
+            © {new Date().getFullYear()} Simone Mendes. Todos os direitos
+            reservados.
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
