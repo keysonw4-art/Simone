@@ -24,6 +24,7 @@ type Props = {
     tagline: string | null;
     priceCents: number;
     benefits: string[];
+    stripePriceId: string | null;
     highlight: boolean;
     isActive: boolean;
     order: number;
@@ -150,6 +151,29 @@ export function PlanForm({
         {errors?.benefits && (
           <span className="text-red-500 text-[10px] font-medium">
             {errors.benefits}
+          </span>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-2 border-t border-black/5 pt-6">
+        <label className="text-xs uppercase tracking-widest text-[var(--color-brand-charcoal)]/70 font-medium">
+          Stripe Price ID
+        </label>
+        <input
+          type="text"
+          name="stripePriceId"
+          defaultValue={defaultValues.stripePriceId ?? ""}
+          className="w-full bg-white border border-black/10 rounded-sm px-4 py-3 text-[var(--color-brand-charcoal)] focus:outline-none focus:border-[var(--color-brand-sage)] transition-colors font-mono text-sm"
+          placeholder="price_1AbC..."
+        />
+        <span className="text-[10px] text-[var(--color-brand-charcoal)]/50 leading-relaxed">
+          ID do preço recorrente criado no painel do Stripe (Products → Add
+          product → recurring/mês). Enquanto vazio, o botão &quot;Assinar&quot;
+          fica desabilitado neste plano.
+        </span>
+        {errors?.stripePriceId && (
+          <span className="text-red-500 text-[10px] font-medium">
+            {errors.stripePriceId}
           </span>
         )}
       </div>

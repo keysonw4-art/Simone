@@ -61,6 +61,7 @@ export default async function EditarPlanoPage({
           tagline: plan.tagline,
           priceCents: plan.priceCents,
           benefits: parseBenefits(plan.benefits),
+          stripePriceId: plan.stripePriceId,
           highlight: plan.highlight,
           isActive: plan.isActive,
           order: plan.order,

@@ -26,6 +26,13 @@ const PlanSchema = z.object({
     .trim()
     .min(1, "Liste ao menos 1 benefício")
     .max(4000),
+  stripePriceId: z
+    .string()
+    .trim()
+    .max(255)
+    .regex(/^price_[A-Za-z0-9]+$/, "Price ID deve começar com 'price_'")
+    .optional()
+    .or(z.literal("")),
   highlight: z.preprocess(
     (v) => v === "on" || v === "true" || v === true,
     z.boolean(),
@@ -47,6 +54,7 @@ type FieldKey =
   | "tagline"
   | "priceCents"
   | "benefits"
+  | "stripePriceId"
   | "highlight"
   | "isActive"
   | "order"
@@ -54,7 +62,7 @@ type FieldKey =
 type PlanFieldErrors = Partial<Record<FieldKey, string>>;
 type PlanValues = Partial<
   Record<
-    "name" | "tagline" | "priceCents" | "benefits" | "order",
+    "name" | "tagline" | "priceCents" | "benefits" | "stripePriceId" | "order",
     string
   > & { highlight: boolean; isActive: boolean }
 >;
@@ -78,6 +86,7 @@ function valuesFrom(formData: FormData): PlanValues {
     tagline: (formData.get("tagline") as string) ?? "",
     priceCents: (formData.get("priceCents") as string) ?? "",
     benefits: (formData.get("benefits") as string) ?? "",
+    stripePriceId: (formData.get("stripePriceId") as string) ?? "",
     order: (formData.get("order") as string) ?? "",
     highlight: formData.get("highlight") === "on",
     isActive: formData.get("isActive") === "on",
@@ -119,8 +128,16 @@ export async function updatePlanAction(
     return { errors: flattenZod(parsed.error), values: valuesFrom(formData) };
   }
 
-  const { name, tagline, priceCents, benefits, highlight, isActive, order } =
-    parsed.data;
+  const {
+    name,
+    tagline,
+    priceCents,
+    benefits,
+    stripePriceId,
+    highlight,
+    isActive,
+    order,
+  } = parsed.data;
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -138,6 +155,7 @@ export async function updatePlanAction(
           tagline: tagline || null,
           priceCents,
           benefits: benefitsTextToJson(benefits),
+          stripePriceId: stripePriceId || null,
           highlight,
           isActive,
           order,
@@ -176,6 +194,7 @@ export async function updatePlanAction(
       tagline: tagline ?? "",
       priceCents: String(priceCents),
       benefits,
+      stripePriceId: stripePriceId ?? "",
       order: String(order),
       highlight,
       isActive,

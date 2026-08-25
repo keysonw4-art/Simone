@@ -47,6 +47,10 @@ model Plan {
   isActive    Boolean   @default(true)
   order       Int       @default(0)
 
+  // Stripe: ID do Price recorrente (mensal). Sem isso, o botão "Assinar"
+  // fica desabilitado (fallback pro estado "em breve").
+  stripePriceId String?
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
@@ -75,6 +79,9 @@ model User {
 
   // Avatar (path no bucket fotos-perfil, privado — signed URL na hora de exibir)
   avatarPath      String?
+
+  // Stripe: 1 Customer por usuário, reusado entre assinaturas
+  stripeCustomerId String?  @unique
 
   // Relations
   subscriptions   Subscription[]
@@ -142,10 +149,17 @@ model Subscription {
   isActive    Boolean   @default(true)
   expiresAt   DateTime?
 
+  // Stripe. Ausentes = assinatura concedida manualmente pelo admin.
+  stripeSubscriptionId String?  @unique
+  stripeStatus         String?   // trialing, active, past_due, canceled, unpaid...
+  currentPeriodEnd     DateTime? // fim do ciclo pago atual
+  cancelAtPeriodEnd    Boolean   @default(false)
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   @@index([userId, isActive])
+  @@index([stripeSubscriptionId])
 }
 
 model Course {

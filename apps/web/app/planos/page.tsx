@@ -2,6 +2,7 @@ import Link from "next/link";
 import { auth } from "@repo/auth";
 import { prisma } from "@repo/database";
 import { ArrowLeft, Check } from "lucide-react";
+import { startCheckoutAction, openBillingPortalAction } from "@/actions/billing";
 
 function formatBRL(cents: number): string {
   return new Intl.NumberFormat("pt-BR", {
@@ -22,16 +23,42 @@ function parseBenefits(raw: string): string[] {
   return raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 }
 
-export default async function PlanosPage() {
-  const [session, plans] = await Promise.all([
+export default async function PlanosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ assinatura?: string; checkout?: string; erro?: string }>;
+}) {
+  const [session, plans, sp] = await Promise.all([
     auth(),
     prisma.plan.findMany({
       where: { isActive: true, deletedAt: null },
       orderBy: { order: "asc" },
     }),
+    searchParams,
   ]);
 
   const isLogged = !!session?.user;
+
+  // Assinatura ativa? (assinante vê "Gerenciar" em vez de "Assinar")
+  const hasActiveSubscription =
+    isLogged &&
+    !!(await prisma.subscription.findFirst({
+      where: {
+        userId: session!.user.id,
+        isActive: true,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      select: { id: true },
+    }));
+
+  const banner =
+    sp?.checkout === "cancelado"
+      ? { tone: "neutro" as const, text: "Checkout cancelado. Você pode assinar quando quiser." }
+      : sp?.erro === "indisponivel"
+        ? { tone: "erro" as const, text: "Este plano ainda não está disponível para assinatura." }
+        : sp?.erro === "checkout"
+          ? { tone: "erro" as const, text: "Não foi possível iniciar o checkout. Tente novamente." }
+          : null;
 
   return (
     <div className="min-h-screen bg-[var(--color-brand-offwhite)] py-16 md:py-24 px-6">
@@ -56,6 +83,34 @@ export default async function PlanosPage() {
             Comece quando quiser, cancele quando precisar.
           </p>
         </header>
+
+        {banner && (
+          <div
+            className={`max-w-2xl mx-auto mb-10 rounded-sm border px-5 py-4 text-sm text-center ${
+              banner.tone === "erro"
+                ? "border-red-200 bg-red-50 text-red-700"
+                : "border-black/10 bg-white text-[var(--color-brand-charcoal)]/70"
+            }`}
+          >
+            {banner.text}
+          </div>
+        )}
+
+        {hasActiveSubscription && (
+          <div className="max-w-2xl mx-auto mb-10 rounded-sm border border-[var(--color-brand-sage)]/30 bg-[var(--color-brand-sage)]/5 px-6 py-5 text-center">
+            <p className="text-sm text-[var(--color-brand-charcoal)]/80 mb-3">
+              Você já tem uma assinatura ativa.
+            </p>
+            <form action={openBillingPortalAction}>
+              <button
+                type="submit"
+                className="text-xs uppercase tracking-[0.2em] font-semibold text-[var(--color-brand-sage)] hover:text-[var(--color-brand-charcoal)] transition-colors"
+              >
+                Gerenciar assinatura →
+              </button>
+            </form>
+          </div>
+        )}
 
         {plans.length === 0 ? (
           <div className="bg-white border border-black/5 rounded-lg p-12 text-center max-w-2xl mx-auto">
@@ -119,31 +174,63 @@ export default async function PlanosPage() {
                   </ul>
 
                   <div className="p-8 pt-0">
-                    {isLogged ? (
-                      <button
-                        type="button"
-                        disabled
-                        className={`w-full px-6 py-4 text-xs font-semibold uppercase tracking-[0.2em] rounded-sm cursor-not-allowed opacity-60 ${
-                          plan.highlight
-                            ? "bg-[var(--color-brand-gold)] text-white"
-                            : "bg-[var(--color-brand-sage)] text-white"
-                        }`}
-                        title="Pagamento será integrado em fase posterior"
-                      >
-                        Assinar (em breve)
-                      </button>
-                    ) : (
-                      <Link
-                        href="/signup"
-                        className={`block text-center w-full px-6 py-4 text-xs font-semibold uppercase tracking-[0.2em] rounded-sm transition-colors ${
-                          plan.highlight
-                            ? "bg-[var(--color-brand-gold)] text-white hover:bg-[var(--color-brand-charcoal)]"
-                            : "bg-[var(--color-brand-sage)] text-white hover:bg-[var(--color-brand-charcoal)]"
-                        }`}
-                      >
-                        Criar conta
-                      </Link>
-                    )}
+                    {(() => {
+                      const btnClass = `block text-center w-full px-6 py-4 text-xs font-semibold uppercase tracking-[0.2em] rounded-sm transition-colors ${
+                        plan.highlight
+                          ? "bg-[var(--color-brand-gold)] text-white hover:bg-[var(--color-brand-charcoal)]"
+                          : "bg-[var(--color-brand-sage)] text-white hover:bg-[var(--color-brand-charcoal)]"
+                      }`;
+
+                      // Visitante → criar conta primeiro
+                      if (!isLogged) {
+                        return (
+                          <Link href="/signup" className={btnClass}>
+                            Criar conta
+                          </Link>
+                        );
+                      }
+
+                      // Já assinante → gerenciar (via portal)
+                      if (hasActiveSubscription) {
+                        return (
+                          <form action={openBillingPortalAction}>
+                            <button
+                              type="submit"
+                              className={`${btnClass} border border-black/10 !bg-white !text-[var(--color-brand-charcoal)] hover:!bg-[var(--color-brand-offwhite)]`}
+                            >
+                              Gerenciar assinatura
+                            </button>
+                          </form>
+                        );
+                      }
+
+                      // Plano sem Price ID no Stripe → ainda indisponível
+                      if (!plan.stripePriceId) {
+                        return (
+                          <button
+                            type="button"
+                            disabled
+                            className={`w-full px-6 py-4 text-xs font-semibold uppercase tracking-[0.2em] rounded-sm cursor-not-allowed opacity-60 ${
+                              plan.highlight
+                                ? "bg-[var(--color-brand-gold)] text-white"
+                                : "bg-[var(--color-brand-sage)] text-white"
+                            }`}
+                            title="Pagamento em configuração"
+                          >
+                            Assinar (em breve)
+                          </button>
+                        );
+                      }
+
+                      // Pronto pra cobrar → checkout
+                      return (
+                        <form action={startCheckoutAction.bind(null, plan.id)}>
+                          <button type="submit" className={btnClass}>
+                            Assinar
+                          </button>
+                        </form>
+                      );
+                    })()}
                   </div>
                 </article>
               );
@@ -152,8 +239,8 @@ export default async function PlanosPage() {
         )}
 
         <p className="text-center text-xs text-[var(--color-brand-charcoal)]/50 mt-12 max-w-2xl mx-auto leading-relaxed">
-          Integração de pagamento via Stripe entra em fase posterior. Por ora,
-          ativação de assinatura é feita manualmente pelo administrador.
+          Pagamento processado com segurança pela Stripe. Cancele quando quiser
+          pelo painel de gerenciamento da assinatura.
         </p>
       </div>
     </div>
