@@ -28,10 +28,15 @@ export async function logLoginFailure(params: {
   userId?: string;
 }): Promise<void> {
   try {
+    // Tentativas já bloqueadas são registradas sob um evento distinto para
+    // NÃO alimentarem o próprio rate limit (senão a janela nunca zera enquanto
+    // o usuário insiste). Só falhas genuínas contam como "login_failure".
+    const event =
+      params.reason === "rate_limited" ? "login_blocked" : "login_failure";
     await prisma.systemLog.create({
       data: {
         userId: params.userId ?? null,
-        event: "login_failure",
+        event,
         origin: params.origin,
         description: JSON.stringify({
           reason: params.reason,

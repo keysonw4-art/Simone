@@ -58,8 +58,11 @@ async function main() {
         VALUES ($1, $1, $2, null, null)
         ON CONFLICT (id) DO NOTHING;
       `, bucket.id, bucket.public);
-    } catch (e: any) {
-      console.error(`Erro ao criar bucket ${bucket.id}:`, e.message);
+    } catch (e) {
+      console.error(
+        `Erro ao criar bucket ${bucket.id}:`,
+        e instanceof Error ? e.message : String(e),
+      );
     }
   }
 

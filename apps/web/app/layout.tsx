@@ -7,9 +7,36 @@ import LenisProvider from "../components/LenisProvider";
 const montserrat = Montserrat({ subsets: ["latin"], variable: "--font-montserrat", weight: ["300", "400", "500", "600", "700"] });
 const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-didot", weight: ["400", "500", "600", "700"] });
 
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://simone-site-web.vercel.app";
+
 export const metadata: Metadata = {
-  title: "Simone Mendes | Plataforma de Cursos",
-  description: "Educação Digital para Personal Organizers",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Simone Mendes | Cursos de Organização",
+    template: "%s | Simone Mendes",
+  },
+  description:
+    "Cursos, metodologias e materiais de organização com Simone Mendes. Transforme a sua relação com a casa, no seu tempo.",
+  keywords: [
+    "organização",
+    "personal organizer",
+    "organização de casa",
+    "método de organização",
+    "Simone Mendes",
+    "cursos de organização",
+  ],
+  authors: [{ name: "Simone Mendes" }],
+  robots: { index: true, follow: true },
+  openGraph: {
+    type: "website",
+    locale: "pt_BR",
+    url: SITE_URL,
+    siteName: "Simone Mendes",
+    title: "Simone Mendes | Cursos de Organização",
+    description:
+      "Cursos, metodologias e materiais de organização com Simone Mendes. Transforme a sua relação com a casa, no seu tempo.",
+  },
 };
 
 export default function RootLayout({
