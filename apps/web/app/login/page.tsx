@@ -1,6 +1,8 @@
 "use client";
+import Link from "next/link";
 import { useActionState, useRef, useEffect } from "react";
 import gsap from "gsap";
+import { ArrowLeft } from "lucide-react";
 import { useFormStatus } from "react-dom";
 import { loginAction } from "@repo/auth/actions";
 
@@ -33,9 +35,21 @@ export default function LoginPage() {
       <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-[var(--color-brand-sage)]/5 rounded-full blur-[120px] pointer-events-none -translate-y-1/4 translate-x-1/4"></div>
       <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-[var(--color-brand-gold)]/5 rounded-full blur-[100px] pointer-events-none translate-y-1/4 -translate-x-1/4"></div>
 
+      <Link
+        href="/"
+        className="absolute top-6 left-6 z-20 inline-flex items-center gap-2 text-xs uppercase tracking-widest text-[var(--color-brand-charcoal)]/50 hover:text-[var(--color-brand-sage)] transition-colors"
+      >
+        <ArrowLeft className="w-3.5 h-3.5" /> Início
+      </Link>
+
       <div ref={formRef} className="w-full max-w-md bg-white p-10 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.04)] border border-black/5 relative z-10">
         <div className="text-center mb-10">
-          <h1 className="font-serif text-3xl tracking-widest text-[var(--color-brand-sage)] mb-1">SIMONE MENDES</h1>
+          <Link
+            href="/"
+            className="font-serif text-3xl tracking-widest text-[var(--color-brand-sage)] mb-1 inline-block hover:opacity-80 transition-opacity"
+          >
+            SIMONE MENDES
+          </Link>
           <p className="text-[9px] uppercase tracking-[0.3em] text-[var(--color-brand-charcoal)]/60">Portal do Aluno</p>
         </div>
 
