@@ -37,12 +37,51 @@ const CourseSchema = z.object({
     .max(500)
     .optional()
     .or(z.literal("")),
+  category: z
+    .enum(["FORMACAO", "PRATICO", "TEORICO", "ESPECIALIZADO", "LINHA_DOMESTICA"])
+    .optional()
+    .or(z.literal("")),
+  workloadHours: z
+    .string()
+    .trim()
+    .regex(/^\d*$/, "Carga horária deve ser um número inteiro")
+    .max(6)
+    .optional()
+    .or(z.literal("")),
+  soldStandalone: z.preprocess(
+    (v) => v === "on" || v === "true" || v === true,
+    z.boolean(),
+  ),
+  standalonePriceCents: z
+    .string()
+    .trim()
+    .regex(/^\d*$/, "Preço deve ser um número inteiro em centavos")
+    .max(9)
+    .optional()
+    .or(z.literal("")),
 });
 
-type FieldKey = "title" | "slug" | "description" | "thumbnail" | "form";
+type FieldKey =
+  | "title"
+  | "slug"
+  | "description"
+  | "thumbnail"
+  | "category"
+  | "workloadHours"
+  | "standalonePriceCents"
+  | "form";
 type CourseFieldErrors = Partial<Record<FieldKey, string>>;
 type CourseValues = Partial<
-  Record<"title" | "slug" | "description" | "thumbnail", string>
+  Record<
+    | "title"
+    | "slug"
+    | "description"
+    | "thumbnail"
+    | "category"
+    | "workloadHours"
+    | "standalonePriceCents",
+    string
+  > & { soldStandalone: boolean }
 >;
 
 export type CourseFormState =
@@ -64,6 +103,34 @@ function valuesFrom(formData: FormData): CourseValues {
     slug: (formData.get("slug") as string) ?? "",
     description: (formData.get("description") as string) ?? "",
     thumbnail: (formData.get("thumbnail") as string) ?? "",
+    category: (formData.get("category") as string) ?? "",
+    workloadHours: (formData.get("workloadHours") as string) ?? "",
+    standalonePriceCents: (formData.get("standalonePriceCents") as string) ?? "",
+    soldStandalone: formData.get("soldStandalone") === "on",
+  };
+}
+
+// Converte os campos comerciais do form pro shape do Prisma.
+function commercialData(d: {
+  category?: string;
+  workloadHours?: string;
+  soldStandalone: boolean;
+  standalonePriceCents?: string;
+}) {
+  return {
+    category: d.category
+      ? (d.category as
+          | "FORMACAO"
+          | "PRATICO"
+          | "TEORICO"
+          | "ESPECIALIZADO"
+          | "LINHA_DOMESTICA")
+      : null,
+    workloadHours: d.workloadHours ? parseInt(d.workloadHours, 10) : null,
+    soldStandalone: d.soldStandalone,
+    standalonePriceCents: d.standalonePriceCents
+      ? parseInt(d.standalonePriceCents, 10)
+      : null,
   };
 }
 
@@ -90,7 +157,7 @@ export async function createCourseAction(
     return { errors: flattenZod(parsed.error), values: valuesFrom(formData) };
   }
 
-  const { title, slug, description, thumbnail } = parsed.data;
+  const { title, slug, description, thumbnail, ...commercial } = parsed.data;
 
   let created;
   try {
@@ -100,6 +167,7 @@ export async function createCourseAction(
         slug,
         description: description || null,
         thumbnail: thumbnail || null,
+        ...commercialData(commercial),
       },
     });
   } catch (error) {
@@ -143,7 +211,7 @@ export async function updateCourseAction(
     return { errors: flattenZod(parsed.error), values: valuesFrom(formData) };
   }
 
-  const { title, slug, description, thumbnail } = parsed.data;
+  const { title, slug, description, thumbnail, ...commercial } = parsed.data;
 
   try {
     await prisma.course.update({
@@ -153,6 +221,7 @@ export async function updateCourseAction(
         slug,
         description: description || null,
         thumbnail: thumbnail || null,
+        ...commercialData(commercial),
       },
     });
   } catch (error) {
@@ -178,7 +247,7 @@ export async function updateCourseAction(
   revalidatePath("/cursos");
   revalidatePath(`/cursos/${id}`);
 
-  return { errors: {}, values: { title, slug, description, thumbnail } };
+  return { errors: {}, values: valuesFrom(formData) };
 }
 
 export async function archiveCourseAction(id: string): Promise<void> {

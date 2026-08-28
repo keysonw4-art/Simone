@@ -26,6 +26,10 @@ export default async function EditarCursoPage({
       description: true,
       thumbnail: true,
       isArchived: true,
+      category: true,
+      workloadHours: true,
+      soldStandalone: true,
+      standalonePriceCents: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -113,6 +117,10 @@ export default async function EditarCursoPage({
             slug: course.slug,
             description: course.description,
             thumbnail: course.thumbnail,
+            category: course.category,
+            workloadHours: course.workloadHours,
+            soldStandalone: course.soldStandalone,
+            standalonePriceCents: course.standalonePriceCents,
           }}
           submitLabel="Salvar Alterações"
           successMessage="Alterações salvas."
