@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   LayoutDashboard,
   PlayCircle,
+  GraduationCap,
   Users,
   CreditCard,
   Tag,
@@ -17,7 +18,8 @@ import { logoutAction } from "../actions/auth";
 
 const navItems = [
   { href: "/", label: "Visão Geral", icon: LayoutDashboard },
-  { href: "/cursos", label: "Cursos", icon: PlayCircle },
+  { href: "/produtos", label: "Cursos", icon: GraduationCap },
+  { href: "/cursos", label: "Módulos", icon: PlayCircle },
   { href: "/alunos", label: "Alunos", icon: Users },
   { href: "/planos", label: "Planos", icon: Tag },
   { href: "/assinaturas", label: "Assinaturas", icon: CreditCard },
