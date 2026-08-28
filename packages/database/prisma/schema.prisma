@@ -36,62 +36,95 @@ enum TicketPriority {
   URGENT
 }
 
+// ---------------------------------------------------------------------------
+// Modelo comercial v2 — compra única com acesso por prazo (entitlements).
+// Vocabulário do painel: Módulo = Course · Curso = Product · Aula = Lesson.
+// ---------------------------------------------------------------------------
+
+// Categoria/agrupamento do módulo (Course). Dirige a página de avulsos.
+enum CourseCategory {
+  FORMACAO // compõe a Formação (os 10 módulos principais)
+  PRATICO
+  TEORICO
+  ESPECIALIZADO
+  LINHA_DOMESTICA
+}
+
+enum CertificateType {
+  DECLARATION // declaração de horas
+  PROFESSIONAL // certificado profissional (habilita atuação)
+}
+
+// Escopo do direito de acesso.
+enum EntitlementScope {
+  ALL // Premium/Founder — tudo, dinâmico (inclui conteúdo futuro)
+  COURSE // um módulo específico (Formação/Assistente/avulso)
+}
+
+enum PurchaseStatus {
+  PENDING
+  PAID
+  REFUNDED
+}
+
 model Plan {
-  id          String    @id @default(uuid())
-  type        PlanType  @unique
-  name        String
-  tagline     String?
-  priceCents  Int
-  benefits    String    // JSON: string[]
-  highlight   Boolean   @default(false)
-  isActive    Boolean   @default(true)
-  order       Int       @default(0)
+  id         String   @id @default(uuid())
+  type       PlanType @unique
+  name       String
+  tagline    String?
+  priceCents Int
+  benefits   String // JSON: string[]
+  highlight  Boolean  @default(false)
+  isActive   Boolean  @default(true)
+  order      Int      @default(0)
 
   // Stripe: ID do Price recorrente (mensal). Sem isso, o botão "Assinar"
   // fica desabilitado (fallback pro estado "em breve").
   stripePriceId String?
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([isActive, order])
 }
 
 model User {
-  id              String    @id @default(uuid())
-  publicId        String    @unique // SIM-2026-0001
-  email           String    @unique
-  passwordHash    String?
-  name            String?
-  role            Role      @default(STUDENT)
+  id           String  @id @default(uuid())
+  publicId     String  @unique // SIM-2026-0001
+  email        String  @unique
+  passwordHash String?
+  name         String?
+  role         Role    @default(STUDENT)
 
   // LGPD
   acceptedTermsAt DateTime?
 
   // Timestamps & Soft Delete
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deletedAt       DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   // Admin block (distinto de deletedAt / self-service LGPD)
-  blockedAt       DateTime?
+  blockedAt DateTime?
 
   // Avatar (path no bucket fotos-perfil, privado — signed URL na hora de exibir)
-  avatarPath      String?
+  avatarPath String?
 
-  // Stripe: 1 Customer por usuário, reusado entre assinaturas
-  stripeCustomerId String?  @unique
+  // Stripe: 1 Customer por usuário, reusado entre compras
+  stripeCustomerId String? @unique
 
   // Relations
-  subscriptions   Subscription[]
-  progress        Progress[]
-  auditLogs       AuditLog[]
-  systemLogs      SystemLog[]
-  supportTickets  SupportTicket[]   @relation("ticket_user")
-  ticketMessages  TicketMessage[]   @relation("message_author")
-  certificates    Certificate[]
-  favorites       Favorite[]
+  subscriptions  Subscription[] // DEPRECATED (modelo antigo, remover no cutover)
+  purchases      Purchase[]
+  entitlements   Entitlement[]
+  progress       Progress[]
+  auditLogs      AuditLog[]
+  systemLogs     SystemLog[]
+  supportTickets SupportTicket[] @relation("ticket_user")
+  ticketMessages TicketMessage[] @relation("message_author")
+  certificates   Certificate[]
+  favorites      Favorite[]
 }
 
 model PublicIdCounter {
@@ -105,114 +138,130 @@ model TicketCounter {
 }
 
 model SupportTicket {
-  id        String          @id @default(uuid())
-  publicId  String          @unique  // TKT-2026-0001
-  userId    String
-  user      User            @relation("ticket_user", fields: [userId], references: [id])
+  id       String @id @default(uuid())
+  publicId String @unique // TKT-2026-0001
+  userId   String
+  user     User   @relation("ticket_user", fields: [userId], references: [id])
 
-  subject   String
-  status    TicketStatus    @default(OPEN)
-  priority  TicketPriority  @default(NORMAL)
+  subject  String
+  status   TicketStatus   @default(OPEN)
+  priority TicketPriority @default(NORMAL)
 
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   closedAt  DateTime?
   deletedAt DateTime?
 
-  messages  TicketMessage[]
+  messages TicketMessage[]
 
   @@index([status, createdAt])
   @@index([userId, status])
 }
 
 model TicketMessage {
-  id         String        @id @default(uuid())
-  ticketId   String
-  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  id       String        @id @default(uuid())
+  ticketId String
+  ticket   SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 
-  authorId   String
-  author     User          @relation("message_author", fields: [authorId], references: [id])
+  authorId String
+  author   User   @relation("message_author", fields: [authorId], references: [id])
 
   body       String
-  isInternal Boolean       @default(false)
+  isInternal Boolean @default(false)
 
-  createdAt  DateTime      @default(now())
+  createdAt DateTime @default(now())
 
   @@index([ticketId, createdAt])
 }
 
 model Subscription {
-  id          String    @id @default(uuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  planType    PlanType
-  isActive    Boolean   @default(true)
-  expiresAt   DateTime?
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planType  PlanType
+  isActive  Boolean   @default(true)
+  expiresAt DateTime?
 
   // Stripe. Ausentes = assinatura concedida manualmente pelo admin.
-  stripeSubscriptionId String?  @unique
-  stripeStatus         String?   // trialing, active, past_due, canceled, unpaid...
+  stripeSubscriptionId String?   @unique
+  stripeStatus         String? // trialing, active, past_due, canceled, unpaid...
   currentPeriodEnd     DateTime? // fim do ciclo pago atual
   cancelAtPeriodEnd    Boolean   @default(false)
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId, isActive])
   @@index([stripeSubscriptionId])
 }
 
+// Course = "Módulo" no painel — unidade atômica de conteúdo, reutilizável
+// entre Cursos (Product) e vendável avulso.
 model Course {
-  id          String    @id @default(uuid())
+  id          String  @id @default(uuid())
   title       String
   description String?
-  slug        String    @unique
+  slug        String  @unique
   thumbnail   String?
-  isArchived  Boolean   @default(false)
-  
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
+  isArchived  Boolean @default(false)
 
-  modules      Module[]
-  certificates Certificate[]
-  materials    Material[]
+  // Comercial v2
+  category                CourseCategory?
+  workloadHours           Int? // carga horária (informativa/certificado)
+  soldStandalone          Boolean         @default(true) // aparece na página de avulsos?
+  standalonePriceCents    Int? // preço avulso
+  standaloneStripePriceId String? // Price do avulso no Stripe
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  modules        Module[]
+  certificates   Certificate[]
+  materials      Material[]
+  productCourses ProductCourse[]
+  purchases      Purchase[] // compras avulsas deste módulo
+  entitlements   Entitlement[]
 }
 
 model Material {
-  id           String    @id @default(uuid())
-  courseId     String
-  course       Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid())
+  courseId String
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   title        String
   description  String?
-  filename     String       // nome original preservado pra Content-Disposition
-  path         String       // path no bucket arquivos-alunos
+  filename     String // nome original preservado pra Content-Disposition
+  path         String // path no bucket arquivos-alunos
   sizeBytes    Int
   mimeType     String
-  requiredPlan PlanType  @default(BASIC)
-  order        Int       @default(0)
+  requiredPlan PlanType @default(BASIC)
+  order        Int      @default(0)
 
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  deletedAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([courseId, order])
 }
 
 model Certificate {
-  id           String   @id @default(uuid())
-  publicCode   String   @unique  // CERT-2026-00001
-  userId       String
-  user         User     @relation(fields: [userId], references: [id])
-  courseId     String
-  course       Course   @relation(fields: [courseId], references: [id])
+  id         String @id @default(uuid())
+  publicCode String @unique // CERT-2026-00001
+  userId     String
+  user       User   @relation(fields: [userId], references: [id])
+  courseId   String
+  course     Course @relation(fields: [courseId], references: [id])
 
   // Snapshots (imutáveis pós-emissão)
-  studentName  String
-  courseTitle  String
+  studentName String
+  courseTitle String
 
-  issuedAt     DateTime @default(now())
+  // Tipo: declaração de horas (avulso/Assistente) ou certificado profissional
+  // (Formação/Premium). Definido na emissão conforme o produto de origem.
+  type CertificateType @default(DECLARATION)
+
+  issuedAt DateTime @default(now())
 
   @@unique([userId, courseId])
   @@index([publicCode])
@@ -224,53 +273,53 @@ model CertificateCounter {
 }
 
 model Module {
-  id          String    @id @default(uuid())
+  id          String  @id @default(uuid())
   courseId    String
-  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  course      Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
   title       String
   description String?
-  order       Int       @default(0)
+  order       Int     @default(0)
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  lessons     Lesson[]
-  favorites   Favorite[]
+  lessons   Lesson[]
+  favorites Favorite[]
 
   @@index([courseId, order])
 }
 
 model Lesson {
-  id          String    @id @default(uuid())
-  moduleId    String
-  module      Module    @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  title       String
-  description String?
-  vimeoVideoId String?    // apenas o ID numérico, ex: "824804225"
-  isProtected Boolean   @default(true)
-  order       Int       @default(0)
+  id           String  @id @default(uuid())
+  moduleId     String
+  module       Module  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title        String
+  description  String?
+  vimeoVideoId String? // apenas o ID numérico, ex: "824804225"
+  isProtected  Boolean @default(true)
+  order        Int     @default(0)
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  progress    Progress[]
-  favorites   Favorite[]
+  progress  Progress[]
+  favorites Favorite[]
 
   @@index([moduleId, order])
 }
 
 model Favorite {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  lessonId  String?
-  lesson    Lesson?  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  lessonId String?
+  lesson   Lesson? @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 
-  moduleId  String?
-  module    Module?  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  moduleId String?
+  module   Module? @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
@@ -280,42 +329,137 @@ model Favorite {
 }
 
 model Progress {
-  id              String    @id @default(uuid())
-  userId          String
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  lessonId        String
-  lesson          Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  
-  isCompleted     Boolean   @default(false)
-  completedAt     DateTime?
-  lastWatchedAt   DateTime  @default(now())
+  id       String @id @default(uuid())
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId String
+  lesson   Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  isCompleted   Boolean   @default(false)
+  completedAt   DateTime?
+  lastWatchedAt DateTime  @default(now())
 
   @@unique([userId, lessonId])
 }
 
 model AuditLog {
-  id          String    @id @default(uuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id])
-  action      String    // "course.create", "course.archive", "user.role_change"
-  details     String?   // JSON estruturado com contexto
+  id      String  @id @default(uuid())
+  userId  String
+  user    User    @relation(fields: [userId], references: [id])
+  action  String // "course.create", "course.archive", "user.role_change"
+  details String? // JSON estruturado com contexto
 
-  createdAt   DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
   @@index([action, createdAt])
 }
 
 model SystemLog {
-  id          String    @id @default(uuid())
+  id          String  @id @default(uuid())
   userId      String?
-  user        User?     @relation(fields: [userId], references: [id])
-  event       String    // "login_failure", "critical_error", "access_denied"
-  origin      String    // IP, "system" ou nome do serviço
-  description String?   // JSON estruturado com contexto
+  user        User?   @relation(fields: [userId], references: [id])
+  event       String // "login_failure", "critical_error", "access_denied"
+  origin      String // IP, "system" ou nome do serviço
+  description String? // JSON estruturado com contexto
 
-  createdAt   DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([event, createdAt])
   @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Comercial v2 — Product (Curso), ProductCourse, Purchase, Entitlement.
+// ---------------------------------------------------------------------------
+
+// Product = "Curso" no painel — produto vendável, montado a partir de módulos.
+model Product {
+  id                String           @id @default(uuid())
+  slug              String           @unique
+  name              String
+  tagline           String?
+  description       String?
+  priceCents        Int
+  accessMonths      Int              @default(12) // 18 no Founder
+  grantsAll         Boolean          @default(false) // Premium/Founder → acesso TUDO
+  certificateType   CertificateType? // null = não emite certificado
+  includesMentoring Boolean          @default(false)
+  maxSeats          Int? // Founder = 100 (null = ilimitado)
+  seatsSold         Int              @default(0)
+  highlight         Boolean          @default(false)
+  isActive          Boolean          @default(true)
+  order             Int              @default(0)
+  stripePriceId     String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  productCourses ProductCourse[]
+  purchases      Purchase[]
+
+  @@index([isActive, order])
+}
+
+// Quais módulos um Curso concede (bundles que enumeram; grantsAll ignora isto).
+model ProductCourse {
+  id        String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  courseId  String
+  course    Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  order     Int     @default(0)
+
+  @@unique([productId, courseId])
+  @@index([productId, order])
+}
+
+// Compra única. Referencia um Curso (bundle) OU um Módulo avulso (course).
+model Purchase {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
+  courseId  String?
+  course    Course?  @relation(fields: [courseId], references: [id])
+
+  amountCents Int
+  status      PurchaseStatus @default(PENDING)
+
+  stripeCheckoutSessionId String? @unique
+  stripePaymentIntentId   String? @unique
+
+  purchasedAt DateTime?
+  expiresAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entitlements Entitlement[]
+
+  @@index([userId, status])
+}
+
+// Direito de acesso materializado. É o que a checagem de acesso consulta.
+model Entitlement {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  scope    EntitlementScope
+  courseId String?
+  course   Course?          @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  expiresAt  DateTime
+  purchaseId String
+  purchase   Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, courseId])
+  @@index([expiresAt])
 }
