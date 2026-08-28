@@ -53,7 +53,7 @@ export function CourseThumbnailUploader({ courseId, currentUrl }: Props) {
 
         <div className="flex-1">
           <h3 className="text-xs uppercase tracking-widest text-[var(--color-brand-charcoal)]/70 font-medium mb-1">
-            Thumbnail do Curso
+            Thumbnail do Módulo
           </h3>
           <p className="text-[10px] text-[var(--color-brand-charcoal)]/50 mb-4 leading-relaxed">
             Upload converte automaticamente para WebP. Máximo 5 MB. Formatos

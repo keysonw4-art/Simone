@@ -47,7 +47,7 @@ export function CourseRowActions({ courseId, isArchived }: Props) {
       <form
         action={remove}
         onSubmit={(e) => {
-          if (!confirm("Excluir este curso? Esta ação é reversível pelo banco.")) {
+          if (!confirm("Excluir este módulo? Esta ação é reversível pelo banco.")) {
             e.preventDefault();
           }
         }}

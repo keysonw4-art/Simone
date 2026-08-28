@@ -70,7 +70,7 @@ export default async function EditarCursoPage({
         href="/cursos"
         className="inline-flex items-center gap-1 text-xs uppercase tracking-widest text-[var(--color-brand-charcoal)]/60 hover:text-[var(--color-brand-sage)] mb-6 transition-colors"
       >
-        <ChevronLeft className="w-3.5 h-3.5" /> Cursos
+        <ChevronLeft className="w-3.5 h-3.5" /> Módulos
       </Link>
 
       <header className="mb-10 flex items-end justify-between gap-4 flex-wrap">
@@ -86,7 +86,7 @@ export default async function EditarCursoPage({
             )}
           </div>
           <p className="text-[var(--color-brand-charcoal)]/60 text-sm uppercase tracking-widest">
-            {modules.length} módulo(s) • criado em{" "}
+            {modules.length} seção(ões) • criado em{" "}
             {course.createdAt.toLocaleDateString("pt-BR")}
           </p>
         </div>
@@ -108,7 +108,7 @@ export default async function EditarCursoPage({
 
       <section className="mb-12">
         <h2 className="text-xs uppercase tracking-widest text-[var(--color-brand-charcoal)]/70 font-medium mb-6">
-          Dados do curso
+          Dados do módulo
         </h2>
         <CourseForm
           action={boundUpdate}
@@ -130,13 +130,13 @@ export default async function EditarCursoPage({
       <section>
         <div className="flex items-end justify-between mb-6">
           <h2 className="text-xs uppercase tracking-widest text-[var(--color-brand-charcoal)]/70 font-medium">
-            Módulos
+            Seções
           </h2>
           <Link
             href={`/cursos/${course.id}/modulos/novo`}
             className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--color-brand-sage)] text-white text-[10px] uppercase tracking-widest rounded-sm hover:bg-[var(--color-brand-charcoal)] transition-colors"
           >
-            <Plus className="w-3.5 h-3.5" /> Novo Módulo
+            <Plus className="w-3.5 h-3.5" /> Nova Seção
           </Link>
         </div>
 
@@ -144,7 +144,7 @@ export default async function EditarCursoPage({
           {modules.length === 0 ? (
             <div className="p-12 text-center">
               <p className="text-[var(--color-brand-charcoal)]/40 text-sm uppercase tracking-widest">
-                Nenhum módulo criado ainda
+                Nenhuma seção criada ainda
               </p>
             </div>
           ) : (

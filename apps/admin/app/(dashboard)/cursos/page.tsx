@@ -47,17 +47,17 @@ export default async function CursosPage({
       <header className="mb-10 flex items-end justify-between gap-4 flex-wrap">
         <div>
           <h1 className="font-serif text-4xl text-[var(--color-brand-charcoal)] tracking-wide">
-            Cursos
+            Módulos
           </h1>
           <p className="text-[var(--color-brand-charcoal)]/60 mt-2 text-sm uppercase tracking-widest">
-            Catálogo da plataforma
+            Conteúdo — as peças que montam os cursos
           </p>
         </div>
         <Link
           href="/cursos/novo"
           className="inline-flex items-center gap-2 px-5 py-3 bg-[var(--color-brand-sage)] text-white text-xs uppercase tracking-widest rounded-sm hover:bg-[var(--color-brand-charcoal)] transition-colors"
         >
-          <Plus className="w-4 h-4" /> Novo Curso
+          <Plus className="w-4 h-4" /> Novo Módulo
         </Link>
       </header>
 
@@ -84,7 +84,7 @@ export default async function CursosPage({
         {courses.length === 0 ? (
           <div className="p-12 text-center">
             <p className="text-[var(--color-brand-charcoal)]/40 text-sm uppercase tracking-widest">
-              Nenhum curso encontrado neste filtro
+              Nenhum módulo encontrado neste filtro
             </p>
           </div>
         ) : (
@@ -93,7 +93,7 @@ export default async function CursosPage({
               <tr className="border-b border-black/5 text-[10px] uppercase tracking-widest text-[var(--color-brand-charcoal)]/60">
                 <th className="text-left px-6 py-4 font-medium">Título</th>
                 <th className="text-left px-6 py-4 font-medium">Slug</th>
-                <th className="text-left px-6 py-4 font-medium">Módulos</th>
+                <th className="text-left px-6 py-4 font-medium">Seções</th>
                 <th className="text-left px-6 py-4 font-medium">Status</th>
                 <th className="text-left px-6 py-4 font-medium">Criado</th>
                 <th className="text-right px-6 py-4 font-medium">Ações</th>

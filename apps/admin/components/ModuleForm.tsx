@@ -74,7 +74,7 @@ export function ModuleForm({
           rows={4}
           defaultValue={defaultValues?.description ?? ""}
           className="w-full bg-white border border-black/10 rounded-sm px-4 py-3 text-[var(--color-brand-charcoal)] focus:outline-none focus:border-[var(--color-brand-sage)] transition-colors resize-y"
-          placeholder="Resumo do módulo (opcional)"
+          placeholder="Resumo da seção (opcional)"
         />
         {errors?.description && (
           <span className="text-red-500 text-[10px] font-medium">

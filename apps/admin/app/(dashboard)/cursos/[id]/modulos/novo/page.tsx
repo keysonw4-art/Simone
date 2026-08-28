@@ -31,14 +31,14 @@ export default async function NovoModuloPage({
 
       <header className="mb-10">
         <h1 className="font-serif text-4xl text-[var(--color-brand-charcoal)] tracking-wide">
-          Novo Módulo
+          Nova Seção
         </h1>
         <p className="text-[var(--color-brand-charcoal)]/60 mt-2 text-sm uppercase tracking-widest">
           {course.title}
         </p>
       </header>
 
-      <ModuleForm action={boundCreate} submitLabel="Criar Módulo" />
+      <ModuleForm action={boundCreate} submitLabel="Criar Seção" />
     </div>
   );
 }

@@ -72,7 +72,7 @@ export function ModuleListItem({ courseId, module, isFirst, isLast }: Props) {
         <form
           action={remove}
           onSubmit={(e) => {
-            if (!confirm("Excluir este módulo? As aulas dentro dele permanecem no banco.")) {
+            if (!confirm("Excluir esta seção? As aulas dentro dela permanecem no banco.")) {
               e.preventDefault();
             }
           }}

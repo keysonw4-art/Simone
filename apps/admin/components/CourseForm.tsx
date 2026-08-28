@@ -84,7 +84,7 @@ export function CourseForm({
           value={title}
           onChange={(e) => handleTitleChange(e.target.value)}
           className="w-full bg-white border border-black/10 rounded-sm px-4 py-3 text-[var(--color-brand-charcoal)] focus:outline-none focus:border-[var(--color-brand-sage)] transition-colors"
-          placeholder="Ex.: Organize sua Vida em 30 dias"
+          placeholder="Ex.: Dobras Profissionais"
         />
         {errors?.title && (
           <span className="text-red-500 text-[10px] font-medium">

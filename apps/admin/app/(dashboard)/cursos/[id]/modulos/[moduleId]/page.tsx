@@ -64,14 +64,14 @@ export default async function EditarModuloPage({
         </div>
         <DangerActionButton
           action={boundDelete}
-          label="Excluir Módulo"
-          confirmMessage="Excluir este módulo?"
+          label="Excluir Seção"
+          confirmMessage="Excluir esta seção?"
         />
       </header>
 
       <section className="mb-12">
         <h2 className="text-xs uppercase tracking-widest text-[var(--color-brand-charcoal)]/70 font-medium mb-6">
-          Dados do módulo
+          Dados da seção
         </h2>
         <ModuleForm
           action={boundUpdate}
