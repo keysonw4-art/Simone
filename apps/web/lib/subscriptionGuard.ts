@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@repo/database";
 import { auth } from "@repo/auth";
+import { hasCourseEntitlement } from "./entitlements";
 
 type SessionUser = {
   id: string;
@@ -95,12 +96,16 @@ export async function requireLessonAccess(lessonId: string): Promise<{
 }> {
   const user = await requireSession();
 
-  const lesson = await prisma.lesson.findFirst({
+  const found = await prisma.lesson.findFirst({
     where: { id: lessonId, deletedAt: null },
-    select: { id: true, isProtected: true },
+    select: {
+      id: true,
+      isProtected: true,
+      module: { select: { courseId: true } },
+    },
   });
 
-  if (!lesson) {
+  if (!found) {
     await logAccessDenied({
       userId: user.id,
       reason: "lesson_not_found",
@@ -108,6 +113,8 @@ export async function requireLessonAccess(lessonId: string): Promise<{
     });
     redirect("/aluno");
   }
+
+  const lesson = { id: found.id, isProtected: found.isProtected };
 
   if (!lesson.isProtected) {
     return { user, lesson };
@@ -117,6 +124,9 @@ export async function requireLessonAccess(lessonId: string): Promise<{
     return { user, lesson };
   }
 
+  // Acesso concedido por: assinatura ativa (modelo antigo) OU entitlement
+  // ativo que cobre este módulo (modelo novo). Dual-check no período de
+  // transição — nenhum dos dois quebra o outro.
   const active = await prisma.subscription.findFirst({
     where: {
       userId: user.id,
@@ -126,10 +136,14 @@ export async function requireLessonAccess(lessonId: string): Promise<{
     select: { id: true },
   });
 
-  if (!active) {
+  const allowed =
+    Boolean(active) ||
+    (await hasCourseEntitlement(user.id, found.module.courseId));
+
+  if (!allowed) {
     await logAccessDenied({
       userId: user.id,
-      reason: "no_active_subscription",
+      reason: "no_access",
       resource: `protected_lesson:${lessonId}`,
     });
     redirect("/aluno");

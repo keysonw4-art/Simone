@@ -5,6 +5,7 @@ import {
   canAccessTier,
   getHighestActivePlanTier,
 } from "@/lib/planTiers";
+import { hasCourseEntitlement } from "@/lib/entitlements";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,7 @@ export async function GET(
       id: true,
       vimeoVideoId: true,
       isProtected: true,
+      module: { select: { courseId: true } },
     },
   });
   if (!lesson) {
@@ -50,8 +52,14 @@ export async function GET(
   const isStaff = role === "ADMIN" || role === "SUPER_ADMIN";
 
   if (lesson.isProtected && !isStaff) {
+    // Dual-check: assinatura ativa (modelo antigo) OU entitlement que cobre
+    // este módulo (modelo novo).
     const tier = await getHighestActivePlanTier(session.user.id);
-    if (!canAccessTier(tier, "BASIC")) {
+    const allowed =
+      canAccessTier(tier, "BASIC") ||
+      (await hasCourseEntitlement(session.user.id, lesson.module.courseId));
+
+    if (!allowed) {
       await prisma.systemLog
         .create({
           data: {
@@ -60,7 +68,7 @@ export async function GET(
             origin: "lesson_video",
             description: JSON.stringify({
               lessonId: lesson.id,
-              reason: "no_active_subscription",
+              reason: "no_access",
             }),
           },
         })
