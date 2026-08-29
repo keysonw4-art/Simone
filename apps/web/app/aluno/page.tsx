@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { auth } from "@repo/auth";
 import { prisma } from "@repo/database";
 import { ArrowRight, PlayCircle, BookOpen, Sparkles, CreditCard } from "lucide-react";
 import { TIER_LABELS } from "@/lib/planTiers";
 import { openBillingPortalAction } from "@/actions/billing";
+import { resolveStudentAccess } from "@/lib/entitlements";
 
 function formatDate(d: Date): string {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" }).format(d);
@@ -11,18 +13,21 @@ function formatDate(d: Date): string {
 
 export default async function AlunoHomePage() {
   const session = await auth();
-  const firstName =
-    session?.user?.name?.trim().split(" ")[0] ?? "aluno(a)";
+  if (!session?.user) redirect("/login");
+  const user = session.user;
+  const firstName = user.name?.trim().split(" ")[0] ?? "aluno(a)";
 
-  const isStaff =
-    session?.user?.role === "ADMIN" || session?.user?.role === "SUPER_ADMIN";
+  const isStaff = user.role === "ADMIN" || user.role === "SUPER_ADMIN";
 
-  // Assinatura ativa (registro completo, pra exibir plano/renovação/portal)
+  const access = await resolveStudentAccess(user.id, user.role);
+  const hasAccess = access.hasAny;
+
+  // Assinatura antiga (só pra exibir "Gerenciar assinatura" a quem ainda tem)
   const activeSub = isStaff
     ? null
     : await prisma.subscription.findFirst({
         where: {
-          userId: session?.user?.id,
+          userId: user.id,
           isActive: true,
           OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
         },
@@ -35,12 +40,14 @@ export default async function AlunoHomePage() {
         },
       });
 
-  const hasActiveSubscription = isStaff || !!activeSub;
-
-  // Se tiver assinatura ativa, busca os cursos disponíveis
-  const courses = hasActiveSubscription
+  // Cursos (módulos) acessíveis
+  const courses = hasAccess
     ? await prisma.course.findMany({
-        where: { isArchived: false, deletedAt: null },
+        where: {
+          isArchived: false,
+          deletedAt: null,
+          ...(access.accessAll ? {} : { id: { in: [...access.courseIds] } }),
+        },
         orderBy: { createdAt: "desc" },
         include: {
           _count: {
@@ -50,8 +57,8 @@ export default async function AlunoHomePage() {
       })
     : [];
 
-  // Sem assinatura: mostra amostra de até 3 aulas de cortesia no dashboard
-  const previewLessons = hasActiveSubscription
+  // Sem acesso: amostra de até 3 aulas de cortesia no dashboard
+  const previewLessons = hasAccess
     ? []
     : await prisma.lesson.findMany({
         where: {
@@ -98,7 +105,7 @@ export default async function AlunoHomePage() {
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-        {!hasActiveSubscription && previewLessons.length === 0 && (
+        {!hasAccess && previewLessons.length === 0 && (
           <div className="bg-white border border-black/5 rounded-lg p-10 shadow-sm md:col-span-2 flex flex-col items-center text-center">
             <div className="w-16 h-16 border border-[var(--color-brand-sage)]/30 flex items-center justify-center mb-6 text-[var(--color-brand-sage)] rounded-sm">
               <PlayCircle className="w-6 h-6" />
@@ -107,19 +114,19 @@ export default async function AlunoHomePage() {
               Seus cursos
             </h2>
             <p className="text-base text-[var(--color-brand-charcoal)]/60 leading-relaxed max-w-lg mb-8">
-              Você ainda não está matriculado em nenhum curso. Assim que ativar
-              sua assinatura, todo o conteúdo aparece aqui.
+              Você ainda não tem acesso a nenhum módulo. Assim que comprar um
+              curso ou um avulso, o conteúdo aparece aqui.
             </p>
             <Link
               href="/planos"
               className="bg-[var(--color-brand-sage)] text-white px-8 py-4 text-xs font-semibold uppercase tracking-[0.2em] hover:bg-[var(--color-brand-charcoal)] transition-colors duration-500 shadow-xl shadow-[var(--color-brand-sage)]/20"
             >
-              Conhecer os planos
+              Conhecer os cursos
             </Link>
           </div>
         )}
 
-        {!hasActiveSubscription && previewLessons.length > 0 && (
+        {!hasAccess && previewLessons.length > 0 && (
           <div className="bg-white border border-black/5 rounded-lg p-8 md:p-10 shadow-sm md:col-span-2">
             <div className="flex items-start justify-between gap-6 flex-wrap mb-8">
               <div>
@@ -130,8 +137,8 @@ export default async function AlunoHomePage() {
                   Uma amostra do método
                 </h2>
                 <p className="text-sm text-[var(--color-brand-charcoal)]/60 mt-2 max-w-lg leading-relaxed">
-                  Você ainda não tem plano. Estas aulas estão liberadas para
-                  você experimentar.
+                  Você ainda não tem acesso ativo. Estas aulas estão liberadas
+                  para você experimentar.
                 </p>
               </div>
               <Link
@@ -202,7 +209,7 @@ export default async function AlunoHomePage() {
           <p className="text-sm text-[var(--color-brand-charcoal)]/60 leading-relaxed">
             E-mail:{" "}
             <span className="text-[var(--color-brand-charcoal)] font-medium">
-              {session?.user?.email}
+              {user.email}
             </span>
           </p>
 
@@ -257,7 +264,7 @@ export default async function AlunoHomePage() {
         </div>
       </div>
 
-      {hasActiveSubscription && courses.length > 0 && (
+      {hasAccess && courses.length > 0 && (
         <div>
           <h2 className="font-serif text-3xl text-[var(--color-brand-charcoal)] mb-8 tracking-wide">
             Meus Cursos

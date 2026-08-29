@@ -6,6 +6,7 @@ import {
   canAccessTier,
   getHighestActivePlanTier,
 } from "@/lib/planTiers";
+import { hasCourseEntitlement } from "@/lib/entitlements";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +40,10 @@ export async function GET(
 
   if (!isStaff) {
     const userTier = await getHighestActivePlanTier(session.user.id);
-    if (!canAccessTier(userTier, material.requiredPlan)) {
+    const allowed =
+      canAccessTier(userTier, material.requiredPlan) ||
+      (await hasCourseEntitlement(session.user.id, material.courseId));
+    if (!allowed) {
       await prisma.systemLog
         .create({
           data: {

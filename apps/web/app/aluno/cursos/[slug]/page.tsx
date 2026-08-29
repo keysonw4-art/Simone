@@ -1,21 +1,17 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { prisma } from "@repo/database";
-import { ArrowLeft, PlayCircle, Lock, FileText, Download } from "lucide-react";
-import { requireActiveSubscription } from "@/lib/subscriptionGuard";
+import { ArrowLeft, PlayCircle, FileText, Download } from "lucide-react";
+import { requireSession } from "@/lib/subscriptionGuard";
 import { FavoriteToggleButton } from "@/components/FavoriteToggleButton";
-import {
-  canAccessTier,
-  getHighestActivePlanTier,
-  TIER_LABELS,
-} from "@/lib/planTiers";
+import { resolveStudentAccess, canAccess } from "@/lib/entitlements";
 
 export default async function CourseDetailsPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const user = await requireActiveSubscription();
+  const user = await requireSession();
   const resolvedParams = await params;
 
   const course = await prisma.course.findUnique({
@@ -41,6 +37,12 @@ export default async function CourseDetailsPage({
 
   if (!course) {
     notFound();
+  }
+
+  // Acesso por-módulo: precisa ter direito a ESTE módulo (Course).
+  const access = await resolveStudentAccess(user.id, user.role);
+  if (!canAccess(access, course.id)) {
+    redirect("/aluno/cursos");
   }
 
   // Estatísticas de progresso
@@ -79,14 +81,8 @@ export default async function CourseDetailsPage({
       description: true,
       filename: true,
       sizeBytes: true,
-      requiredPlan: true,
     },
   });
-
-  const isStaff = user.role === "ADMIN" || user.role === "SUPER_ADMIN";
-  const userTier = isStaff ? null : await getHighestActivePlanTier(user.id);
-  const canAccess = (required: (typeof materials)[number]["requiredPlan"]) =>
-    isStaff || canAccessTier(userTier, required);
 
   function formatSize(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;
@@ -141,67 +137,37 @@ export default async function CourseDetailsPage({
             <FileText className="w-3.5 h-3.5" /> Materiais
           </h2>
           <div className="bg-white border border-black/5 rounded-sm overflow-hidden shadow-sm">
-            {materials.map((m) => {
-              const accessible = canAccess(m.requiredPlan);
-              return (
-                <div
-                  key={m.id}
-                  className="flex items-center gap-4 px-5 py-4 border-b border-black/5 last:border-b-0"
-                >
-                  <div
-                    className={`w-10 h-10 rounded-sm flex items-center justify-center flex-shrink-0 ${
-                      accessible
-                        ? "bg-[var(--color-brand-sage)]/10 text-[var(--color-brand-sage)]"
-                        : "bg-black/5 text-[var(--color-brand-charcoal)]/40"
-                    }`}
-                  >
-                    {accessible ? (
-                      <FileText className="w-4 h-4" />
-                    ) : (
-                      <Lock className="w-4 h-4" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-[var(--color-brand-charcoal)] truncate">
-                      {m.title}
-                    </div>
-                    {m.description && (
-                      <p className="text-xs text-[var(--color-brand-charcoal)]/60 mt-0.5 truncate">
-                        {m.description}
-                      </p>
-                    )}
-                    <div className="text-[10px] text-[var(--color-brand-charcoal)]/40 mt-1">
-                      {formatSize(m.sizeBytes)}
-                      {!accessible && (
-                        <>
-                          {" · "}Requer plano{" "}
-                          <span className="text-[var(--color-brand-gold)] font-medium">
-                            {TIER_LABELS[m.requiredPlan]}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  {accessible ? (
-                    <a
-                      href={`/api/aluno/download/${m.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-4 py-2 text-[10px] uppercase tracking-widest border border-[var(--color-brand-sage)]/30 text-[var(--color-brand-sage)] rounded-sm hover:bg-[var(--color-brand-sage)]/5 transition-colors"
-                    >
-                      <Download className="w-3.5 h-3.5" /> Baixar
-                    </a>
-                  ) : (
-                    <Link
-                      href="/planos"
-                      className="inline-flex items-center gap-2 px-4 py-2 text-[10px] uppercase tracking-widest border border-[var(--color-brand-gold)]/30 text-[var(--color-brand-gold)] rounded-sm hover:bg-[var(--color-brand-gold)]/5 transition-colors"
-                    >
-                      Fazer upgrade
-                    </Link>
-                  )}
+            {materials.map((m) => (
+              <div
+                key={m.id}
+                className="flex items-center gap-4 px-5 py-4 border-b border-black/5 last:border-b-0"
+              >
+                <div className="w-10 h-10 rounded-sm flex items-center justify-center flex-shrink-0 bg-[var(--color-brand-sage)]/10 text-[var(--color-brand-sage)]">
+                  <FileText className="w-4 h-4" />
                 </div>
-              );
-            })}
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-[var(--color-brand-charcoal)] truncate">
+                    {m.title}
+                  </div>
+                  {m.description && (
+                    <p className="text-xs text-[var(--color-brand-charcoal)]/60 mt-0.5 truncate">
+                      {m.description}
+                    </p>
+                  )}
+                  <div className="text-[10px] text-[var(--color-brand-charcoal)]/40 mt-1">
+                    {formatSize(m.sizeBytes)}
+                  </div>
+                </div>
+                <a
+                  href={`/api/aluno/download/${m.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 text-[10px] uppercase tracking-widest border border-[var(--color-brand-sage)]/30 text-[var(--color-brand-sage)] rounded-sm hover:bg-[var(--color-brand-sage)]/5 transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" /> Baixar
+                </a>
+              </div>
+            ))}
           </div>
         </section>
       )}

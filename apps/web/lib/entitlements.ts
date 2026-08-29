@@ -56,3 +56,43 @@ export async function hasAnyActiveAccess(userId: string): Promise<boolean> {
   });
   return Boolean(found);
 }
+
+/**
+ * Acesso do aluno na área — combina o modelo antigo (assinatura ativa =
+ * acesso a tudo, durante a transição) com o novo (entitlements) e staff.
+ * Fonte única de verdade para as telas do aluno.
+ */
+export type StudentAccess = {
+  accessAll: boolean; // vê todos os módulos
+  courseIds: Set<string>; // módulos específicos liberados
+  hasAny: boolean; // tem algum acesso?
+};
+
+export async function resolveStudentAccess(
+  userId: string,
+  role: string,
+): Promise<StudentAccess> {
+  const isStaff = role === "ADMIN" || role === "SUPER_ADMIN";
+  const now = new Date();
+
+  const oldSub = isStaff
+    ? null
+    : await prisma.subscription.findFirst({
+        where: {
+          userId,
+          isActive: true,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+        },
+        select: { id: true },
+      });
+
+  const access = await getUserAccess(userId);
+  const accessAll = isStaff || Boolean(oldSub) || access.grantsAll;
+  const hasAny = accessAll || access.courseIds.size > 0;
+
+  return { accessAll, courseIds: access.courseIds, hasAny };
+}
+
+export function canAccess(access: StudentAccess, courseId: string): boolean {
+  return access.accessAll || access.courseIds.has(courseId);
+}
