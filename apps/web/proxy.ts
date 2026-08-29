@@ -14,6 +14,7 @@ const handler: NextMiddleware = auth((req) => {
   const isPublicRoute =
     pathname === "/" ||
     pathname.startsWith("/planos") ||
+    pathname.startsWith("/avulsos") ||
     pathname.startsWith("/termos") ||
     pathname.startsWith("/privacidade") ||
     pathname.startsWith("/validacao");
