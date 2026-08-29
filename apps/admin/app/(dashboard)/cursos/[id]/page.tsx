@@ -5,7 +5,7 @@ import { prisma } from "@repo/database";
 import { updateCourseAction } from "../../../../actions/courses";
 import { CourseForm } from "../../../../components/CourseForm";
 import { CourseRowActions } from "../../../../components/CourseRowActions";
-import { ModuleListItem } from "../../../../components/ModuleListItem";
+import { LessonListItem } from "../../../../components/LessonListItem";
 import { CourseThumbnailUploader } from "../../../../components/CourseThumbnailUploader";
 import { MaterialUploader } from "../../../../components/MaterialUploader";
 import { MaterialListItem } from "../../../../components/MaterialListItem";
@@ -38,17 +38,27 @@ export default async function EditarCursoPage({
 
   if (!course) notFound();
 
-  const modules = await prisma.module.findMany({
+  const sections = await prisma.module.findMany({
     where: { courseId: course.id, deletedAt: null },
     orderBy: { order: "asc" },
     select: {
       id: true,
       title: true,
-      description: true,
       order: true,
-      _count: { select: { lessons: { where: { deletedAt: null } } } },
+      lessons: {
+        where: { deletedAt: null },
+        orderBy: { order: "asc" },
+        select: {
+          id: true,
+          title: true,
+          isProtected: true,
+          vimeoVideoId: true,
+        },
+      },
     },
   });
+
+  const totalLessons = sections.reduce((acc, s) => acc + s.lessons.length, 0);
 
   const materials = await prisma.material.findMany({
     where: { courseId: course.id, deletedAt: null },
@@ -87,7 +97,7 @@ export default async function EditarCursoPage({
             )}
           </div>
           <p className="text-[var(--color-brand-charcoal)]/60 text-sm uppercase tracking-widest">
-            {modules.length} seção(ões) • criado em{" "}
+            {totalLessons} aula(s) • criado em{" "}
             {course.createdAt.toLocaleDateString("pt-BR")}
           </p>
         </div>
@@ -130,37 +140,86 @@ export default async function EditarCursoPage({
       </section>
 
       <section>
-        <div className="flex items-end justify-between mb-6">
+        <div className="flex items-end justify-between mb-2">
           <h2 className="text-xs uppercase tracking-widest text-[var(--color-brand-charcoal)]/70 font-medium">
-            Seções
+            Aulas
           </h2>
           <Link
             href={`/cursos/${course.id}/modulos/novo`}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--color-brand-sage)] text-white text-[10px] uppercase tracking-widest rounded-sm hover:bg-[var(--color-brand-charcoal)] transition-colors"
+            className="inline-flex items-center gap-2 px-3 py-2 border border-black/10 text-[var(--color-brand-charcoal)]/60 text-[10px] uppercase tracking-widest rounded-sm hover:border-[var(--color-brand-sage)] hover:text-[var(--color-brand-sage)] transition-colors"
           >
-            <Plus className="w-3.5 h-3.5" /> Nova Seção
+            <Plus className="w-3.5 h-3.5" /> Adicionar seção
           </Link>
         </div>
+        <p className="text-[10px] text-[var(--color-brand-charcoal)]/50 mb-6">
+          Os vídeos deste módulo. Adicione as aulas direto; use seções só se
+          quiser agrupar (ex.: &quot;Parte 1&quot;, &quot;Parte 2&quot;).
+        </p>
 
-        <div className="bg-white border border-black/5 rounded-lg overflow-hidden">
-          {modules.length === 0 ? (
-            <div className="p-12 text-center">
-              <p className="text-[var(--color-brand-charcoal)]/40 text-sm uppercase tracking-widest">
-                Nenhuma seção criada ainda
-              </p>
-            </div>
-          ) : (
-            modules.map((m, i) => (
-              <ModuleListItem
-                key={m.id}
-                courseId={course.id}
-                module={m}
-                isFirst={i === 0}
-                isLast={i === modules.length - 1}
-              />
-            ))
-          )}
-        </div>
+        {sections.length === 0 ? (
+          <div className="bg-white border border-black/5 rounded-lg p-12 text-center">
+            <p className="text-[var(--color-brand-charcoal)]/40 text-sm uppercase tracking-widest mb-4">
+              Nenhuma seção ainda
+            </p>
+            <Link
+              href={`/cursos/${course.id}/modulos/novo`}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--color-brand-sage)] text-white text-[10px] uppercase tracking-widest rounded-sm hover:bg-[var(--color-brand-charcoal)] transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" /> Criar seção
+            </Link>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-8">
+            {sections.map((section) => {
+              const isDefault = section.title.trim() === "";
+              return (
+                <div key={section.id}>
+                  {!isDefault && (
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-serif text-lg text-[var(--color-brand-charcoal)]">
+                        {section.title}
+                      </h3>
+                      <Link
+                        href={`/cursos/${course.id}/modulos/${section.id}`}
+                        className="text-[10px] uppercase tracking-widest text-[var(--color-brand-charcoal)]/50 hover:text-[var(--color-brand-sage)] transition-colors"
+                      >
+                        Editar seção
+                      </Link>
+                    </div>
+                  )}
+                  <div className="bg-white border border-black/5 rounded-lg overflow-hidden">
+                    {section.lessons.length === 0 ? (
+                      <div className="p-8 text-center">
+                        <p className="text-[var(--color-brand-charcoal)]/40 text-xs uppercase tracking-widest">
+                          Nenhuma aula ainda
+                        </p>
+                      </div>
+                    ) : (
+                      section.lessons.map((l, li) => (
+                        <LessonListItem
+                          key={l.id}
+                          courseId={course.id}
+                          moduleId={section.id}
+                          lesson={l}
+                          isFirst={li === 0}
+                          isLast={li === section.lessons.length - 1}
+                        />
+                      ))
+                    )}
+                    <div className="p-4 border-t border-black/5 bg-[var(--color-brand-offwhite)]/30">
+                      <Link
+                        href={`/cursos/${course.id}/modulos/${section.id}/aulas/novo`}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--color-brand-sage)] text-white text-[10px] uppercase tracking-widest rounded-sm hover:bg-[var(--color-brand-charcoal)] transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Nova aula
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       <section className="mt-12">

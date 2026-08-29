@@ -112,16 +112,15 @@ export default async function LessonPage({
         </div>
 
         <div className="divide-y divide-black/5">
-          {course.modules.map((module, mIndex) => (
+          {course.modules.map((module) => (
             <div key={module.id} className="bg-white">
-              <div className="p-4 bg-black/5">
-                <h4 className="text-[10px] uppercase tracking-widest text-[var(--color-brand-charcoal)]/70 font-medium">
-                  Módulo {mIndex + 1}
-                </h4>
-                <div className="text-sm font-medium text-[var(--color-brand-charcoal)] mt-1">
-                  {module.title}
+              {module.title.trim() !== "" && (
+                <div className="p-4 bg-black/5">
+                  <div className="text-sm font-medium text-[var(--color-brand-charcoal)]">
+                    {module.title}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div>
                 {module.lessons.map((lesson, lIndex) => {

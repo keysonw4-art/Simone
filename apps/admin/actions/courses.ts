@@ -181,6 +181,9 @@ export async function createCourseAction(
         description: description || null,
         thumbnail: thumbnail || null,
         ...commercialData(commercial),
+        // Seção padrão (título vazio) — as aulas entram direto nela; o admin
+        // pode adicionar seções nomeadas depois se quiser agrupar.
+        modules: { create: { title: "", order: 0 } },
       },
     });
   } catch (error) {

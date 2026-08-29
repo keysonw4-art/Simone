@@ -185,27 +185,26 @@ export default async function CourseDetailsPage({
               key={module.id}
               className="bg-white border border-black/5 rounded-sm overflow-hidden shadow-sm"
             >
-              <div className="p-6 bg-[var(--color-brand-offwhite)]/50 border-b border-black/5 flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="text-[10px] uppercase tracking-widest text-[var(--color-brand-gold)] font-medium mb-2">
-                    Módulo {mIndex + 1}
+              {module.title.trim() !== "" && (
+                <div className="p-6 bg-[var(--color-brand-offwhite)]/50 border-b border-black/5 flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-serif text-2xl text-[var(--color-brand-charcoal)]">
+                      {module.title}
+                    </h3>
+                    {module.description && (
+                      <p className="text-sm text-[var(--color-brand-charcoal)]/60 mt-2">
+                        {module.description}
+                      </p>
+                    )}
                   </div>
-                  <h3 className="font-serif text-2xl text-[var(--color-brand-charcoal)]">
-                    {module.title}
-                  </h3>
-                  {module.description && (
-                    <p className="text-sm text-[var(--color-brand-charcoal)]/60 mt-2">
-                      {module.description}
-                    </p>
-                  )}
+                  <FavoriteToggleButton
+                    kind="module"
+                    id={module.id}
+                    initial={favoritedModuleSet.has(module.id)}
+                    compact
+                  />
                 </div>
-                <FavoriteToggleButton
-                  kind="module"
-                  id={module.id}
-                  initial={favoritedModuleSet.has(module.id)}
-                  compact
-                />
-              </div>
+              )}
 
               <div className="divide-y divide-black/5">
                 {module.lessons.length === 0 ? (
