@@ -39,6 +39,103 @@ async function getOrCreateCustomer(user: {
   return customer.id;
 }
 
+async function loadUserForCheckout(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, name: true, stripeCustomerId: true },
+  });
+  if (!user) redirect("/login");
+  return user;
+}
+
+/**
+ * Modelo v2 — checkout de pagamento único de um Curso (produto).
+ */
+export async function startProductCheckoutAction(
+  productId: string,
+): Promise<void> {
+  const sessionUser = await requireSession();
+  if (sessionUser.role === "ADMIN" || sessionUser.role === "SUPER_ADMIN") {
+    redirect("/aluno");
+  }
+
+  const product = await prisma.product.findFirst({
+    where: { id: productId, isActive: true, deletedAt: null },
+    select: { id: true, stripePriceId: true, maxSeats: true, seatsSold: true },
+  });
+  if (!product || !product.stripePriceId) {
+    redirect("/planos?erro=indisponivel");
+  }
+  if (product.maxSeats != null && product.seatsSold >= product.maxSeats) {
+    redirect("/planos?erro=esgotado");
+  }
+
+  const user = await loadUserForCheckout(sessionUser.id);
+  const customerId = await getOrCreateCustomer(user);
+  const origin = await getOrigin();
+  const stripe = getStripe();
+
+  const meta = { userId: user.id, kind: "product", productId: product.id };
+  const checkout = await stripe.checkout.sessions.create({
+    mode: "payment",
+    customer: customerId,
+    line_items: [{ price: product.stripePriceId, quantity: 1 }],
+    locale: "pt-BR",
+    metadata: meta,
+    payment_intent_data: { metadata: meta },
+    success_url: `${origin}/aluno/cursos?compra=sucesso`,
+    cancel_url: `${origin}/planos?checkout=cancelado`,
+  });
+
+  if (!checkout.url) redirect("/planos?erro=checkout");
+  redirect(checkout.url);
+}
+
+/**
+ * Modelo v2 — checkout de pagamento único de um Módulo avulso.
+ */
+export async function startModuleCheckoutAction(
+  courseId: string,
+): Promise<void> {
+  const sessionUser = await requireSession();
+  if (sessionUser.role === "ADMIN" || sessionUser.role === "SUPER_ADMIN") {
+    redirect("/aluno");
+  }
+
+  const course = await prisma.course.findFirst({
+    where: {
+      id: courseId,
+      deletedAt: null,
+      isArchived: false,
+      soldStandalone: true,
+    },
+    select: { id: true, standaloneStripePriceId: true },
+  });
+  if (!course || !course.standaloneStripePriceId) {
+    redirect("/avulsos?erro=indisponivel");
+  }
+
+  const user = await loadUserForCheckout(sessionUser.id);
+  const customerId = await getOrCreateCustomer(user);
+  const origin = await getOrigin();
+  const stripe = getStripe();
+
+  const meta = { userId: user.id, kind: "course", courseId: course.id };
+  const checkout = await stripe.checkout.sessions.create({
+    mode: "payment",
+    customer: customerId,
+    line_items: [{ price: course.standaloneStripePriceId, quantity: 1 }],
+    locale: "pt-BR",
+    metadata: meta,
+    payment_intent_data: { metadata: meta },
+    success_url: `${origin}/aluno/cursos?compra=sucesso`,
+    cancel_url: `${origin}/avulsos?checkout=cancelado`,
+  });
+
+  if (!checkout.url) redirect("/avulsos?erro=checkout");
+  redirect(checkout.url);
+}
+
 /**
  * Inicia o checkout de assinatura para um plano.
  * Server action chamada pelo botão "Assinar" em /planos.

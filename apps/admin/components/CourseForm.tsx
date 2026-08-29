@@ -32,6 +32,7 @@ type CourseFormProps = {
     workloadHours?: number | null;
     soldStandalone?: boolean;
     standalonePriceCents?: number | null;
+    standaloneStripePriceId?: string | null;
   };
   submitLabel: string;
   successMessage?: string;
@@ -247,6 +248,28 @@ export function CourseForm({
           {errors?.standalonePriceCents && (
             <span className="text-red-500 text-[10px] font-medium">
               {errors.standalonePriceCents}
+            </span>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2 max-w-md">
+          <label className="text-xs uppercase tracking-widest text-[var(--color-brand-charcoal)]/70 font-medium">
+            Stripe Price ID (avulso)
+          </label>
+          <input
+            type="text"
+            name="standaloneStripePriceId"
+            defaultValue={defaultValues?.standaloneStripePriceId ?? ""}
+            className="w-full bg-white border border-black/10 rounded-sm px-4 py-3 text-[var(--color-brand-charcoal)] focus:outline-none focus:border-[var(--color-brand-sage)] transition-colors font-mono text-sm"
+            placeholder="price_1AbC..."
+          />
+          <span className="text-[10px] text-[var(--color-brand-charcoal)]/50">
+            Preço único no Stripe pra compra avulsa deste módulo. Sem isso, o
+            botão de compra avulsa fica desabilitado.
+          </span>
+          {errors?.standaloneStripePriceId && (
+            <span className="text-red-500 text-[10px] font-medium">
+              {errors.standaloneStripePriceId}
             </span>
           )}
         </div>

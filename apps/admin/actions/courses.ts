@@ -59,6 +59,13 @@ const CourseSchema = z.object({
     .max(9)
     .optional()
     .or(z.literal("")),
+  standaloneStripePriceId: z
+    .string()
+    .trim()
+    .max(255)
+    .regex(/^price_[A-Za-z0-9]+$/, "Price ID deve começar com 'price_'")
+    .optional()
+    .or(z.literal("")),
 });
 
 type FieldKey =
@@ -69,6 +76,7 @@ type FieldKey =
   | "category"
   | "workloadHours"
   | "standalonePriceCents"
+  | "standaloneStripePriceId"
   | "form";
 type CourseFieldErrors = Partial<Record<FieldKey, string>>;
 type CourseValues = Partial<
@@ -79,7 +87,8 @@ type CourseValues = Partial<
     | "thumbnail"
     | "category"
     | "workloadHours"
-    | "standalonePriceCents",
+    | "standalonePriceCents"
+    | "standaloneStripePriceId",
     string
   > & { soldStandalone: boolean }
 >;
@@ -106,6 +115,8 @@ function valuesFrom(formData: FormData): CourseValues {
     category: (formData.get("category") as string) ?? "",
     workloadHours: (formData.get("workloadHours") as string) ?? "",
     standalonePriceCents: (formData.get("standalonePriceCents") as string) ?? "",
+    standaloneStripePriceId:
+      (formData.get("standaloneStripePriceId") as string) ?? "",
     soldStandalone: formData.get("soldStandalone") === "on",
   };
 }
@@ -116,6 +127,7 @@ function commercialData(d: {
   workloadHours?: string;
   soldStandalone: boolean;
   standalonePriceCents?: string;
+  standaloneStripePriceId?: string;
 }) {
   return {
     category: d.category
@@ -131,6 +143,7 @@ function commercialData(d: {
     standalonePriceCents: d.standalonePriceCents
       ? parseInt(d.standalonePriceCents, 10)
       : null,
+    standaloneStripePriceId: d.standaloneStripePriceId || null,
   };
 }
 

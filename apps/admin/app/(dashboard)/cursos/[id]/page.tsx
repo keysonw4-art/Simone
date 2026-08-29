@@ -30,6 +30,7 @@ export default async function EditarCursoPage({
       workloadHours: true,
       soldStandalone: true,
       standalonePriceCents: true,
+      standaloneStripePriceId: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -121,6 +122,7 @@ export default async function EditarCursoPage({
             workloadHours: course.workloadHours,
             soldStandalone: course.soldStandalone,
             standalonePriceCents: course.standalonePriceCents,
+            standaloneStripePriceId: course.standaloneStripePriceId,
           }}
           submitLabel="Salvar Alterações"
           successMessage="Alterações salvas."
