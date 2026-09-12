@@ -108,7 +108,7 @@ export default async function LogsPage({
         })}
       </div>
 
-      <div className="bg-white border border-black/5 rounded-lg overflow-hidden">
+      <div className="bg-white border border-black/5 rounded-lg overflow-x-auto">
         {tab === "system" && systemLogs && (
           <LogsTable
             rows={systemLogs.map((l) => ({
@@ -178,7 +178,7 @@ function LogsTable({
   }
 
   return (
-    <table className="w-full">
+    <table className="w-full min-w-[560px]">
       <thead>
         <tr className="border-b border-black/5 text-[10px] uppercase tracking-widest text-[var(--color-brand-charcoal)]/60">
           <th className="text-left px-6 py-4 font-medium">Quando</th>

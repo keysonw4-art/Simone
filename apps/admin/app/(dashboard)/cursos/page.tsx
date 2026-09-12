@@ -80,7 +80,7 @@ export default async function CursosPage({
         })}
       </div>
 
-      <div className="bg-white border border-black/5 rounded-lg overflow-hidden">
+      <div className="bg-white border border-black/5 rounded-lg overflow-x-auto">
         {courses.length === 0 ? (
           <div className="p-12 text-center">
             <p className="text-[var(--color-brand-charcoal)]/40 text-sm uppercase tracking-widest">
@@ -88,7 +88,7 @@ export default async function CursosPage({
             </p>
           </div>
         ) : (
-          <table className="w-full">
+          <table className="w-full min-w-[560px]">
             <thead>
               <tr className="border-b border-black/5 text-[10px] uppercase tracking-widest text-[var(--color-brand-charcoal)]/60">
                 <th className="text-left px-6 py-4 font-medium">Título</th>

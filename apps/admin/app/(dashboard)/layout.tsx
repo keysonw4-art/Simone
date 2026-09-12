@@ -22,7 +22,9 @@ export default async function DashboardLayout({
           role: session.user.role,
         }}
       />
-      <main className="flex-1 p-12 relative overflow-hidden">{children}</main>
+      <main className="flex-1 px-5 md:px-12 pt-20 md:pt-12 pb-10 md:pb-12 relative overflow-x-hidden min-w-0">
+        {children}
+      </main>
     </div>
   );
 }

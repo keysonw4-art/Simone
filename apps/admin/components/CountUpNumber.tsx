@@ -13,7 +13,7 @@ type Props = {
 
 export function CountUpNumber({
   value,
-  prefix,
+  prefix = "",
   separator = ".",
   decimal = ",",
   duration = 1.5,
