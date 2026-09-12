@@ -105,9 +105,10 @@ export default async function Home() {
           </nav>
           <Link
             href="/login"
-            className="bg-[var(--color-brand-charcoal)] text-white px-6 py-3 text-xs uppercase tracking-[0.15em] rounded-sm hover:bg-[var(--color-brand-sage)] transition-colors duration-500 flex items-center gap-2 group"
+            className="bg-[var(--color-brand-charcoal)] text-white px-4 sm:px-6 py-2.5 sm:py-3 text-[11px] sm:text-xs uppercase tracking-[0.15em] rounded-sm hover:bg-[var(--color-brand-sage)] transition-colors duration-500 flex items-center gap-2 group whitespace-nowrap flex-shrink-0"
           >
-            Área do Aluno
+            <span className="sm:hidden">Entrar</span>
+            <span className="hidden sm:inline">Área do Aluno</span>
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </Link>
         </div>

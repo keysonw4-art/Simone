@@ -39,13 +39,13 @@ export function LandingHero() {
   return (
     <section
       ref={rootRef}
-      className="relative z-10 min-h-[100dvh] flex flex-col items-center justify-center px-6 pt-32 pb-20 text-center"
+      className="relative z-10 min-h-[100dvh] flex flex-col items-center justify-center px-6 pt-28 sm:pt-32 pb-20 text-center"
     >
-      <p className="hero-reveal text-[11px] uppercase tracking-[0.3em] text-[var(--color-brand-sage)] mb-6 opacity-0">
+      <p className="hero-reveal text-[10px] sm:text-[11px] uppercase tracking-[0.25em] sm:tracking-[0.3em] text-[var(--color-brand-sage)] mb-5 sm:mb-6 opacity-0">
         Educação em organização
       </p>
 
-      <h1 className="hero-reveal font-serif text-5xl md:text-7xl lg:text-[5.25rem] text-[var(--color-brand-charcoal)] mb-8 leading-[1.08] max-w-4xl opacity-0">
+      <h1 className="hero-reveal font-serif text-4xl sm:text-5xl md:text-7xl lg:text-[5.25rem] text-[var(--color-brand-charcoal)] mb-6 sm:mb-8 leading-[1.1] md:leading-[1.08] max-w-4xl opacity-0">
         Transformando <i className="text-[var(--color-brand-gold)] not-italic italic">Espaços</i>,
         <br /> Restaurando a Paz.
       </h1>
