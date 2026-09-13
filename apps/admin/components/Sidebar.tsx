@@ -108,12 +108,14 @@ export function Sidebar({ user }: SidebarProps) {
           >
             <X className="w-5 h-5" />
           </button>
-          <h1 className="font-serif text-2xl tracking-widest text-[var(--color-brand-sage)]">
-            SIMONE MENDES
-          </h1>
-          <p className="text-[9px] uppercase tracking-[0.3em] text-[var(--color-brand-charcoal)]/60 mt-1">
-            Admin
-          </p>
+          <Link href="/" className="block hover:opacity-80 transition-opacity">
+            <h1 className="font-serif text-2xl tracking-widest text-[var(--color-brand-sage)]">
+              SIMONE MENDES
+            </h1>
+            <p className="text-[9px] uppercase tracking-[0.3em] text-[var(--color-brand-charcoal)]/60 mt-1">
+              Admin
+            </p>
+          </Link>
         </div>
 
         {/* Nav */}
