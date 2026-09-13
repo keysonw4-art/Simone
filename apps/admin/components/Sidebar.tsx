@@ -8,8 +8,6 @@ import {
   PlayCircle,
   GraduationCap,
   Users,
-  CreditCard,
-  Tag,
   LifeBuoy,
   FileText,
   LogOut,
@@ -24,8 +22,6 @@ const navItems = [
   { href: "/produtos", label: "Cursos", icon: GraduationCap },
   { href: "/cursos", label: "Módulos", icon: PlayCircle },
   { href: "/alunos", label: "Alunos", icon: Users },
-  { href: "/planos", label: "Planos", icon: Tag },
-  { href: "/assinaturas", label: "Assinaturas", icon: CreditCard },
   { href: "/suporte", label: "Suporte", icon: LifeBuoy },
   { href: "/logs", label: "Logs", icon: FileText },
 ];

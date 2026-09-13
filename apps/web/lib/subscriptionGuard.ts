@@ -62,34 +62,6 @@ export async function requireSession(): Promise<SessionUser> {
   };
 }
 
-export async function requireActiveSubscription(): Promise<SessionUser> {
-  const user = await requireSession();
-
-  if (user.role === "ADMIN" || user.role === "SUPER_ADMIN") {
-    return user;
-  }
-
-  const active = await prisma.subscription.findFirst({
-    where: {
-      userId: user.id,
-      isActive: true,
-      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-    },
-    select: { id: true },
-  });
-
-  if (!active) {
-    await logAccessDenied({
-      userId: user.id,
-      reason: "no_active_subscription",
-      resource: "subscriber_area",
-    });
-    redirect("/aluno");
-  }
-
-  return user;
-}
-
 export async function requireLessonAccess(lessonId: string): Promise<{
   user: SessionUser;
   lesson: { id: string; isProtected: boolean };

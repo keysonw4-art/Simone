@@ -56,44 +56,22 @@ export function MaterialUploader({ courseId }: { courseId: string }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        <div className="flex flex-col gap-1.5">
-          <label className="text-[10px] uppercase tracking-widest text-[var(--color-brand-charcoal)]/70 font-medium">
-            Título
-          </label>
-          <input
-            type="text"
-            name="title"
-            required
-            className="bg-white border border-black/10 rounded-sm px-3 py-2 text-sm text-[var(--color-brand-charcoal)] focus:outline-none focus:border-[var(--color-brand-sage)] transition-colors"
-            placeholder="Ex.: Checklist de organização"
-          />
-          {errors?.title && (
-            <span className="text-red-500 text-[10px] font-medium">
-              {errors.title}
-            </span>
-          )}
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label className="text-[10px] uppercase tracking-widest text-[var(--color-brand-charcoal)]/70 font-medium">
-            Plano mínimo
-          </label>
-          <select
-            name="requiredPlan"
-            required
-            defaultValue="BASIC"
-            className="bg-white border border-black/10 rounded-sm px-3 py-2 text-sm text-[var(--color-brand-charcoal)] focus:outline-none focus:border-[var(--color-brand-sage)] transition-colors"
-          >
-            <option value="BASIC">Básico (acessível a todos com plano)</option>
-            <option value="INTERMEDIATE">Intermediário</option>
-            <option value="PREMIUM">Premium</option>
-          </select>
-          {errors?.requiredPlan && (
-            <span className="text-red-500 text-[10px] font-medium">
-              {errors.requiredPlan}
-            </span>
-          )}
-        </div>
+      <div className="flex flex-col gap-1.5 mb-4">
+        <label className="text-[10px] uppercase tracking-widest text-[var(--color-brand-charcoal)]/70 font-medium">
+          Título
+        </label>
+        <input
+          type="text"
+          name="title"
+          required
+          className="bg-white border border-black/10 rounded-sm px-3 py-2 text-sm text-[var(--color-brand-charcoal)] focus:outline-none focus:border-[var(--color-brand-sage)] transition-colors"
+          placeholder="Ex.: Checklist de organização"
+        />
+        {errors?.title && (
+          <span className="text-red-500 text-[10px] font-medium">
+            {errors.title}
+          </span>
+        )}
       </div>
 
       <div className="flex flex-col gap-1.5 mb-4">

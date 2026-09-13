@@ -70,7 +70,7 @@ export default async function DashboardPage() {
 
   const [
     totalStudents,
-    activeSubs,
+    activeAccessUsers,
     publishedCourses,
     watchedLast30,
     completedLast30,
@@ -79,11 +79,11 @@ export default async function DashboardPage() {
     signupsMonthly,
   ] = await Promise.all([
     prisma.user.count({ where: { role: "STUDENT", deletedAt: null } }),
-    prisma.subscription.count({
-      where: {
-        isActive: true,
-        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-      },
+    // Alunos com acesso ativo = têm ao menos um entitlement não expirado.
+    prisma.entitlement.findMany({
+      where: { expiresAt: { gt: new Date() } },
+      select: { userId: true },
+      distinct: ["userId"],
     }),
     prisma.course.count({ where: { isArchived: false, deletedAt: null } }),
     prisma.progress.count({ where: { lastWatchedAt: { gte: since } } }),
@@ -152,7 +152,7 @@ export default async function DashboardPage() {
         <KpiCard
           icon={<UserCheck className="w-12 h-12" />}
           label="Alunos Ativos"
-          value={activeSubs}
+          value={activeAccessUsers.length}
           accent="gold"
         />
         <KpiCard

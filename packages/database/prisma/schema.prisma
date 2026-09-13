@@ -16,11 +16,6 @@ enum Role {
   SUPER_ADMIN
 }
 
-enum PlanType {
-  BASIC
-  INTERMEDIATE
-  PREMIUM
-}
 
 enum TicketStatus {
   OPEN
@@ -67,28 +62,6 @@ enum PurchaseStatus {
   REFUNDED
 }
 
-model Plan {
-  id         String   @id @default(uuid())
-  type       PlanType @unique
-  name       String
-  tagline    String?
-  priceCents Int
-  benefits   String // JSON: string[]
-  highlight  Boolean  @default(false)
-  isActive   Boolean  @default(true)
-  order      Int      @default(0)
-
-  // Stripe: ID do Price recorrente (mensal). Sem isso, o botão "Assinar"
-  // fica desabilitado (fallback pro estado "em breve").
-  stripePriceId String?
-
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-
-  @@index([isActive, order])
-}
-
 model User {
   id           String  @id @default(uuid())
   publicId     String  @unique // SIM-2026-0001
@@ -115,7 +88,6 @@ model User {
   stripeCustomerId String? @unique
 
   // Relations
-  subscriptions  Subscription[] // DEPRECATED (modelo antigo, remover no cutover)
   purchases      Purchase[]
   entitlements   Entitlement[]
   progress       Progress[]
@@ -191,27 +163,6 @@ model TicketMessage {
   @@index([ticketId, createdAt])
 }
 
-model Subscription {
-  id        String    @id @default(uuid())
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  planType  PlanType
-  isActive  Boolean   @default(true)
-  expiresAt DateTime?
-
-  // Stripe. Ausentes = assinatura concedida manualmente pelo admin.
-  stripeSubscriptionId String?   @unique
-  stripeStatus         String? // trialing, active, past_due, canceled, unpaid...
-  currentPeriodEnd     DateTime? // fim do ciclo pago atual
-  cancelAtPeriodEnd    Boolean   @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId, isActive])
-  @@index([stripeSubscriptionId])
-}
-
 // Course = "Módulo" no painel — unidade atômica de conteúdo, reutilizável
 // entre Cursos (Product) e vendável avulso.
 model Course {
@@ -252,7 +203,6 @@ model Material {
   path         String // path no bucket arquivos-alunos
   sizeBytes    Int
   mimeType     String
-  requiredPlan PlanType @default(BASIC)
   order        Int      @default(0)
 
   createdAt DateTime  @default(now())

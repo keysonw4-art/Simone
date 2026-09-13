@@ -23,7 +23,7 @@ export default async function PerfilPage() {
       avatarPath: true,
       _count: {
         select: {
-          subscriptions: true,
+          purchases: true,
           progress: true,
           supportTickets: { where: { deletedAt: null } },
         },
@@ -83,7 +83,7 @@ export default async function PerfilPage() {
           <Field label="Perfil" value={user.role} mono />
         </div>
         <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-[10px] uppercase tracking-widest text-[var(--color-brand-charcoal)]/50">
-          <span>{user._count.subscriptions} assinatura(s) no histórico</span>
+          <span>{user._count.purchases} compra(s) no histórico</span>
           <span>{user._count.progress} aula(s) com progresso</span>
           <span>{user._count.supportTickets} chamado(s) abertos</span>
         </div>

@@ -97,18 +97,11 @@ export async function toggleUserBlockAction(
   const wasBlocked = !!target.blockedAt;
   const nextBlockedAt = wasBlocked ? null : new Date();
 
-  await prisma.$transaction(async (tx) => {
-    await tx.user.update({
-      where: { id: targetUserId },
-      data: { blockedAt: nextBlockedAt },
-    });
-    // Ao bloquear, cancela subs ativas — impede acesso imediato via guards
-    if (!wasBlocked) {
-      await tx.subscription.updateMany({
-        where: { userId: targetUserId, isActive: true },
-        data: { isActive: false },
-      });
-    }
+  // O acesso é cortado imediatamente pelo choke point isUserActive (entitlements),
+  // então basta marcar/desmarcar blockedAt.
+  await prisma.user.update({
+    where: { id: targetUserId },
+    data: { blockedAt: nextBlockedAt },
   });
 
   await logAuditEvent({

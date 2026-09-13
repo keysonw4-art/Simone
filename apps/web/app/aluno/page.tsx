@@ -2,14 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@repo/auth";
 import { prisma } from "@repo/database";
-import { ArrowRight, PlayCircle, BookOpen, Sparkles, CreditCard } from "lucide-react";
-import { TIER_LABELS } from "@/lib/planTiers";
-import { openBillingPortalAction } from "@/actions/billing";
+import { ArrowRight, PlayCircle, BookOpen, Sparkles } from "lucide-react";
 import { resolveStudentAccess } from "@/lib/entitlements";
-
-function formatDate(d: Date): string {
-  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" }).format(d);
-}
 
 export default async function AlunoHomePage() {
   const session = await auth();
@@ -17,28 +11,8 @@ export default async function AlunoHomePage() {
   const user = session.user;
   const firstName = user.name?.trim().split(" ")[0] ?? "aluno(a)";
 
-  const isStaff = user.role === "ADMIN" || user.role === "SUPER_ADMIN";
-
   const access = await resolveStudentAccess(user.id, user.role);
   const hasAccess = access.hasAny;
-
-  // Assinatura antiga (só pra exibir "Gerenciar assinatura" a quem ainda tem)
-  const activeSub = isStaff
-    ? null
-    : await prisma.subscription.findFirst({
-        where: {
-          userId: user.id,
-          isActive: true,
-          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-        },
-        orderBy: { createdAt: "desc" },
-        select: {
-          planType: true,
-          currentPeriodEnd: true,
-          cancelAtPeriodEnd: true,
-          stripeSubscriptionId: true,
-        },
-      });
 
   // Cursos (módulos) acessíveis
   const courses = hasAccess
@@ -212,34 +186,6 @@ export default async function AlunoHomePage() {
               {user.email}
             </span>
           </p>
-
-          {activeSub && (
-            <div className="mt-4 pt-4 border-t border-black/5">
-              <p className="text-sm text-[var(--color-brand-charcoal)]/60 leading-relaxed">
-                Plano:{" "}
-                <span className="text-[var(--color-brand-charcoal)] font-medium">
-                  {TIER_LABELS[activeSub.planType]}
-                </span>
-              </p>
-              {activeSub.currentPeriodEnd && (
-                <p className="text-xs text-[var(--color-brand-charcoal)]/50 mt-1">
-                  {activeSub.cancelAtPeriodEnd
-                    ? `Acesso até ${formatDate(activeSub.currentPeriodEnd)} (cancelamento agendado)`
-                    : `Renova em ${formatDate(activeSub.currentPeriodEnd)}`}
-                </p>
-              )}
-              {activeSub.stripeSubscriptionId && (
-                <form action={openBillingPortalAction} className="mt-4">
-                  <button
-                    type="submit"
-                    className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-[var(--color-brand-sage)] hover:text-[var(--color-brand-charcoal)] transition-colors"
-                  >
-                    <CreditCard className="w-3.5 h-3.5" /> Gerenciar assinatura
-                  </button>
-                </form>
-              )}
-            </div>
-          )}
 
           <div className="flex flex-col gap-2 mt-6 pt-4 border-t border-black/5">
             <Link

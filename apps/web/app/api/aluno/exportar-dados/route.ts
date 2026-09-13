@@ -21,10 +21,11 @@ export async function GET() {
       acceptedTermsAt: true,
       createdAt: true,
       updatedAt: true,
-      subscriptions: {
+      purchases: {
         select: {
-          planType: true,
-          isActive: true,
+          amountCents: true,
+          status: true,
+          purchasedAt: true,
           expiresAt: true,
           createdAt: true,
         },

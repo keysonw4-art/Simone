@@ -3,8 +3,6 @@ import { notFound } from "next/navigation";
 import { ChevronLeft, UserCircle } from "lucide-react";
 import { prisma } from "@repo/database";
 import { auth } from "@repo/auth";
-import { SubscriptionForm } from "../../../../components/SubscriptionForm";
-import { ToggleSubscriptionButton } from "../../../../components/ToggleSubscriptionButton";
 import { UserRoleControl } from "../../../../components/UserRoleControl";
 import { UserBlockControl } from "../../../../components/UserBlockControl";
 import {
@@ -24,11 +22,6 @@ export default async function AlunoDetalhesPage({
 
   const student = await prisma.user.findUnique({
     where: { id, deletedAt: null },
-    include: {
-      subscriptions: {
-        orderBy: { createdAt: "desc" },
-      },
-    },
   });
 
   if (!student) notFound();
@@ -244,83 +237,6 @@ export default async function AlunoDetalhesPage({
                     </tr>
                   );
                 })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </section>
-
-      <section className="mb-12 opacity-70">
-        <h2 className="text-xs uppercase tracking-widest text-[var(--color-brand-charcoal)]/70 font-medium mb-6">
-          Conceder Assinatura <span className="normal-case text-[10px] text-[var(--color-brand-charcoal)]/40">(modelo antigo)</span>
-        </h2>
-        <SubscriptionForm userId={student.id} />
-      </section>
-
-      <section className="opacity-70">
-        <div className="flex items-end justify-between mb-6">
-          <h2 className="text-xs uppercase tracking-widest text-[var(--color-brand-charcoal)]/70 font-medium">
-            Histórico de Assinaturas{" "}
-            <span className="normal-case text-[10px] text-[var(--color-brand-charcoal)]/40">
-              (modelo antigo)
-            </span>
-          </h2>
-        </div>
-
-        <div className="bg-white border border-black/5 rounded-lg overflow-x-auto">
-          {student.subscriptions.length === 0 ? (
-            <div className="p-12 text-center">
-              <p className="text-[var(--color-brand-charcoal)]/40 text-sm uppercase tracking-widest">
-                Este aluno não possui assinaturas.
-              </p>
-            </div>
-          ) : (
-            <table className="w-full min-w-[560px]">
-              <thead>
-                <tr className="border-b border-black/5 text-[10px] uppercase tracking-widest text-[var(--color-brand-charcoal)]/60">
-                  <th className="text-left px-6 py-4 font-medium">Plano</th>
-                  <th className="text-left px-6 py-4 font-medium">Status</th>
-                  <th className="text-left px-6 py-4 font-medium">Data de Criação</th>
-                  <th className="text-left px-6 py-4 font-medium">Expira em</th>
-                  <th className="text-right px-6 py-4 font-medium">Ação</th>
-                </tr>
-              </thead>
-              <tbody>
-                {student.subscriptions.map((sub) => (
-                  <tr
-                    key={sub.id}
-                    className="border-b border-black/5 last:border-b-0 hover:bg-black/[0.015] transition-colors"
-                  >
-                    <td className="px-6 py-4 text-sm font-medium text-[var(--color-brand-charcoal)]">
-                      {sub.planType}
-                    </td>
-                    <td className="px-6 py-4">
-                      {sub.isActive ? (
-                        <span className="text-[10px] uppercase tracking-widest px-2 py-1 bg-[var(--color-brand-sage)]/10 text-[var(--color-brand-sage)] rounded-sm">
-                          Ativa
-                        </span>
-                      ) : (
-                        <span className="text-[10px] uppercase tracking-widest px-2 py-1 bg-red-500/10 text-red-600 rounded-sm">
-                          Inativa
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-xs text-[var(--color-brand-charcoal)]/60">
-                      {sub.createdAt.toLocaleDateString("pt-BR")}
-                    </td>
-                    <td className="px-6 py-4 text-xs text-[var(--color-brand-charcoal)]/60">
-                      {sub.expiresAt
-                        ? sub.expiresAt.toLocaleDateString("pt-BR")
-                        : "Vitalício"}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <ToggleSubscriptionButton
-                        subscriptionId={sub.id}
-                        isActive={sub.isActive}
-                      />
-                    </td>
-                  </tr>
-                ))}
               </tbody>
             </table>
           )}

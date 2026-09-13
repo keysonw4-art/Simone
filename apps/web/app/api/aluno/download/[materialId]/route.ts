@@ -23,7 +23,6 @@ export async function GET(
       id: true,
       path: true,
       filename: true,
-      requiredPlan: true,
       courseId: true,
     },
   });

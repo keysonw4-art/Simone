@@ -59,10 +59,7 @@ export async function deleteAccountAction(
         },
       });
 
-      await tx.subscription.updateMany({
-        where: { userId, isActive: true },
-        data: { isActive: false },
-      });
+      // Acesso já cai com deletedAt (choke point isUserActive nos entitlements).
 
       await tx.systemLog.create({
         data: {

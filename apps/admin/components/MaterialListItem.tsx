@@ -1,7 +1,6 @@
 "use client";
 
 import { ArrowUp, ArrowDown, FileText } from "lucide-react";
-import type { PlanType } from "@repo/database";
 import {
   deleteMaterialAction,
   moveMaterialDownAction,
@@ -16,22 +15,9 @@ type Props = {
     description: string | null;
     filename: string;
     sizeBytes: number;
-    requiredPlan: PlanType;
   };
   isFirst: boolean;
   isLast: boolean;
-};
-
-const PLAN_LABEL: Record<PlanType, string> = {
-  BASIC: "Básico",
-  INTERMEDIATE: "Intermediário",
-  PREMIUM: "Premium",
-};
-
-const PLAN_STYLE: Record<PlanType, string> = {
-  BASIC: "bg-[var(--color-brand-sage)]/10 text-[var(--color-brand-sage)]",
-  INTERMEDIATE: "bg-[var(--color-brand-gold)]/10 text-[var(--color-brand-gold)]",
-  PREMIUM: "bg-[var(--color-brand-charcoal)]/10 text-[var(--color-brand-charcoal)]",
 };
 
 function formatSize(bytes: number): string {
@@ -95,12 +81,6 @@ export function MaterialListItem({
           {material.filename} · {formatSize(material.sizeBytes)}
         </div>
       </div>
-
-      <span
-        className={`text-[10px] uppercase tracking-widest px-2 py-1 rounded-sm whitespace-nowrap ${PLAN_STYLE[material.requiredPlan]}`}
-      >
-        {PLAN_LABEL[material.requiredPlan]}
-      </span>
 
       <form
         action={remove}

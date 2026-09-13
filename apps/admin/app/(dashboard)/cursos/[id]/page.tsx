@@ -69,7 +69,6 @@ export default async function EditarCursoPage({
       description: true,
       filename: true,
       sizeBytes: true,
-      requiredPlan: true,
     },
   });
 

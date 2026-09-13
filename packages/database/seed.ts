@@ -127,67 +127,6 @@ async function main() {
     }
   });
 
-  const planSeed = [
-    {
-      type: "BASIC" as const,
-      name: "Básico",
-      tagline: "Para começar a organizar",
-      priceCents: 4700,
-      benefits: [
-        "Acesso aos cursos básicos",
-        "Materiais complementares introdutórios",
-        "Suporte por e-mail",
-      ],
-      highlight: false,
-      order: 1,
-    },
-    {
-      type: "INTERMEDIATE" as const,
-      name: "Intermediário",
-      tagline: "Para aprofundar a prática",
-      priceCents: 9700,
-      benefits: [
-        "Tudo do plano Básico",
-        "Acesso aos cursos intermediários",
-        "Checklists e planilhas exclusivas",
-        "Suporte prioritário",
-      ],
-      highlight: true,
-      order: 2,
-    },
-    {
-      type: "PREMIUM" as const,
-      name: "Premium",
-      tagline: "Acesso total ao método",
-      priceCents: 19700,
-      benefits: [
-        "Tudo do plano Intermediário",
-        "Acesso a todos os cursos",
-        "Conteúdos exclusivos Premium",
-        "Atendimento direto com a Simone",
-        "Acesso antecipado a novos cursos",
-      ],
-      highlight: false,
-      order: 3,
-    },
-  ];
-
-  for (const p of planSeed) {
-    await prisma.plan.upsert({
-      where: { type: p.type },
-      update: {},
-      create: {
-        type: p.type,
-        name: p.name,
-        tagline: p.tagline,
-        priceCents: p.priceCents,
-        benefits: JSON.stringify(p.benefits),
-        highlight: p.highlight,
-        order: p.order,
-      },
-    });
-  }
-
   console.log("Super Admin pronto: " + user.email);
   if (!providedPassword) {
     console.log(
@@ -200,7 +139,6 @@ async function main() {
   console.log("Contador publicId inicializado");
   console.log("Buckets do storage garantidos");
   console.log("Curso teste criado: " + course.title);
-  console.log("Planos garantidos: " + planSeed.length);
 }
 
 main()

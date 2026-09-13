@@ -4,7 +4,6 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@repo/database";
-import type { PlanType } from "@repo/database";
 import {
   BUCKETS,
   StorageUploadError,
@@ -45,12 +44,9 @@ const MetaSchema = z.object({
     .max(1000)
     .optional()
     .or(z.literal("")),
-  requiredPlan: z.enum(["BASIC", "INTERMEDIATE", "PREMIUM"], {
-    errorMap: () => ({ message: "Plano inválido" }),
-  }),
 });
 
-type FieldKey = "title" | "description" | "requiredPlan" | "file" | "form";
+type FieldKey = "title" | "description" | "file" | "form";
 type FieldErrors = Partial<Record<FieldKey, string>>;
 
 export type MaterialFormState = { errors: FieldErrors } | undefined;
@@ -89,7 +85,6 @@ export async function uploadMaterialAction(
   const parsed = MetaSchema.safeParse({
     title: formData.get("title") ?? "",
     description: formData.get("description") ?? "",
-    requiredPlan: formData.get("requiredPlan") ?? "",
   });
   if (!parsed.success) return { errors: flatten(parsed.error) };
 
@@ -98,7 +93,7 @@ export async function uploadMaterialAction(
     return { errors: { file: "Selecione um arquivo." } };
   }
 
-  const { title, description, requiredPlan } = parsed.data;
+  const { title, description } = parsed.data;
 
   // Determina o próximo order
   const last = await prisma.material.findFirst({
@@ -118,7 +113,6 @@ export async function uploadMaterialAction(
       path: "", // temporário
       sizeBytes: file.size,
       mimeType: file.type || "application/octet-stream",
-      requiredPlan: requiredPlan as PlanType,
       order,
     },
   });
@@ -158,7 +152,6 @@ export async function uploadMaterialAction(
       courseId,
       slug: course.slug,
       filename: file.name,
-      requiredPlan,
       sizeBytes: file.size,
     },
   });

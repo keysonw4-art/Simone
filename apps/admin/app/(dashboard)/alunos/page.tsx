@@ -12,7 +12,9 @@ export default async function AlunosPage() {
       name: true,
       email: true,
       createdAt: true,
-      _count: { select: { subscriptions: { where: { isActive: true } } } }
+      _count: {
+        select: { entitlements: { where: { expiresAt: { gt: new Date() } } } },
+      },
     },
   });
 
@@ -40,7 +42,7 @@ export default async function AlunosPage() {
               <tr className="border-b border-black/5 text-[10px] uppercase tracking-widest text-[var(--color-brand-charcoal)]/60">
                 <th className="text-left px-6 py-4 font-medium">ID Público</th>
                 <th className="text-left px-6 py-4 font-medium">Nome / E-mail</th>
-                <th className="text-center px-6 py-4 font-medium">Assinaturas Ativas</th>
+                <th className="text-center px-6 py-4 font-medium">Acessos Ativos</th>
                 <th className="text-left px-6 py-4 font-medium">Data de Cadastro</th>
                 <th className="text-right px-6 py-4 font-medium">Ações</th>
               </tr>
@@ -70,9 +72,9 @@ export default async function AlunosPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-center">
-                    {student._count.subscriptions > 0 ? (
+                    {student._count.entitlements > 0 ? (
                       <span className="text-[10px] uppercase tracking-widest px-2 py-1 bg-[var(--color-brand-sage)]/10 text-[var(--color-brand-sage)] rounded-sm">
-                        {student._count.subscriptions}
+                        {student._count.entitlements}
                       </span>
                     ) : (
                       <span className="text-[10px] uppercase tracking-widest px-2 py-1 bg-black/5 text-[var(--color-brand-charcoal)]/50 rounded-sm">
