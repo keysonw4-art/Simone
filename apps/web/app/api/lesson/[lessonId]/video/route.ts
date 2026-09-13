@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@repo/database";
 import { auth } from "@repo/auth";
-import {
-  canAccessTier,
-  getHighestActivePlanTier,
-} from "@/lib/planTiers";
 import { hasCourseEntitlement } from "@/lib/entitlements";
 
 export const dynamic = "force-dynamic";
@@ -52,12 +48,13 @@ export async function GET(
   const isStaff = role === "ADMIN" || role === "SUPER_ADMIN";
 
   if (lesson.isProtected && !isStaff) {
-    // Dual-check: assinatura ativa (modelo antigo) OU entitlement que cobre
-    // este módulo (modelo novo).
-    const tier = await getHighestActivePlanTier(session.user.id);
-    const allowed =
-      canAccessTier(tier, "BASIC") ||
-      (await hasCourseEntitlement(session.user.id, lesson.module.courseId));
+    // Acesso concedido só por entitlement ativo que cobre este módulo
+    // (scope ALL ou COURSE). Assinatura legada NÃO concede acesso — o
+    // fallback antigo dava acesso a qualquer curso pra qualquer assinante.
+    const allowed = await hasCourseEntitlement(
+      session.user.id,
+      lesson.module.courseId,
+    );
 
     if (!allowed) {
       await prisma.systemLog

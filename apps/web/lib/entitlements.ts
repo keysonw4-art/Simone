@@ -58,9 +58,9 @@ export async function hasAnyActiveAccess(userId: string): Promise<boolean> {
 }
 
 /**
- * Acesso do aluno na área — combina o modelo antigo (assinatura ativa =
- * acesso a tudo, durante a transição) com o novo (entitlements) e staff.
- * Fonte única de verdade para as telas do aluno.
+ * Acesso do aluno na área — fonte única de verdade. Baseado em entitlements
+ * (modelo v2) + bypass de staff. Assinatura legada NÃO concede mais acesso:
+ * o fallback antigo tratava qualquer assinante como "acesso a tudo".
  */
 export type StudentAccess = {
   accessAll: boolean; // vê todos os módulos
@@ -73,21 +73,9 @@ export async function resolveStudentAccess(
   role: string,
 ): Promise<StudentAccess> {
   const isStaff = role === "ADMIN" || role === "SUPER_ADMIN";
-  const now = new Date();
-
-  const oldSub = isStaff
-    ? null
-    : await prisma.subscription.findFirst({
-        where: {
-          userId,
-          isActive: true,
-          OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
-        },
-        select: { id: true },
-      });
 
   const access = await getUserAccess(userId);
-  const accessAll = isStaff || Boolean(oldSub) || access.grantsAll;
+  const accessAll = isStaff || access.grantsAll;
   const hasAny = accessAll || access.courseIds.size > 0;
 
   return { accessAll, courseIds: access.courseIds, hasAny };

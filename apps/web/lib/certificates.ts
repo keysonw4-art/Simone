@@ -1,9 +1,11 @@
 import { prisma } from "@repo/database";
+import { hasCourseEntitlement } from "./entitlements";
 
 /**
  * Emite o certificado se o aluno completou 100% das aulas do curso.
  * Idempotente: se já existe certificado (userId, courseId), retorna o existente.
- * Retorna null se: curso sem aulas, curso não encontrado, ou aluno incompleto.
+ * Retorna null se: sem entitlement ativo, curso sem aulas, curso não
+ * encontrado, ou aluno incompleto.
  */
 export async function issueCertificateIfEligible(
   userId: string,
@@ -13,6 +15,11 @@ export async function issueCertificateIfEligible(
     where: { userId_courseId: { userId, courseId } },
   });
   if (existing) return existing;
+
+  // Defesa em profundidade: só emite se o aluno tem/teve direito de acesso ao
+  // curso. Sem isso, progresso forjado geraria certificado oficial de graça.
+  const entitled = await hasCourseEntitlement(userId, courseId);
+  if (!entitled) return null;
 
   const course = await prisma.course.findFirst({
     where: { id: courseId, deletedAt: null },

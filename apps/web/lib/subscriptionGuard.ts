@@ -124,21 +124,10 @@ export async function requireLessonAccess(lessonId: string): Promise<{
     return { user, lesson };
   }
 
-  // Acesso concedido por: assinatura ativa (modelo antigo) OU entitlement
-  // ativo que cobre este módulo (modelo novo). Dual-check no período de
-  // transição — nenhum dos dois quebra o outro.
-  const active = await prisma.subscription.findFirst({
-    where: {
-      userId: user.id,
-      isActive: true,
-      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-    },
-    select: { id: true },
-  });
-
-  const allowed =
-    Boolean(active) ||
-    (await hasCourseEntitlement(user.id, found.module.courseId));
+  // Acesso concedido só por entitlement ativo que cobre este módulo (scope
+  // ALL ou COURSE). Assinatura legada não concede mais acesso — o fallback
+  // antigo liberava qualquer aula protegida pra qualquer assinante.
+  const allowed = await hasCourseEntitlement(user.id, found.module.courseId);
 
   if (!allowed) {
     await logAccessDenied({

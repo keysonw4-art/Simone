@@ -1,22 +1,31 @@
+import { randomBytes } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const passwordHash = await bcrypt.hash("031280admin", 10);
   const year = new Date().getFullYear();
 
+  // Credencial do super admin: NUNCA hardcoded. Vem de SEED_ADMIN_PASSWORD;
+  // se ausente, gera uma aleatória e imprime UMA vez.
+  const adminEmail = process.env.SEED_ADMIN_EMAIL ?? "admin@simone.com.br";
+  const providedPassword = process.env.SEED_ADMIN_PASSWORD;
+  const rawPassword = providedPassword ?? randomBytes(12).toString("base64url");
+  const passwordHash = await bcrypt.hash(rawPassword, 12);
+
+  // Em re-seed, NÃO sobrescreve a senha existente (evita reintroduzir uma
+  // senha fraca por cima de uma já rotacionada). A senha só é definida na
+  // criação inicial.
   const user = await prisma.user.upsert({
-    where: { email: "admin@simone.com.br" },
+    where: { email: adminEmail },
     update: {
-      passwordHash,
       role: "SUPER_ADMIN",
       acceptedTermsAt: new Date(),
     },
     create: {
       publicId: `SIM-${year}-0000`,
-      email: "admin@simone.com.br",
+      email: adminEmail,
       passwordHash,
       name: "Simone Mendes",
       role: "SUPER_ADMIN",
@@ -180,6 +189,14 @@ async function main() {
   }
 
   console.log("Super Admin pronto: " + user.email);
+  if (!providedPassword) {
+    console.log(
+      "\n  ⚠️  Senha do super admin gerada automaticamente (só criação nova):\n" +
+        `      ${rawPassword}\n` +
+        "      Guarde num gerenciador. Defina SEED_ADMIN_PASSWORD pra fixar.\n" +
+        "      (Se o admin já existia, a senha NÃO foi alterada por este seed.)\n",
+    );
+  }
   console.log("Contador publicId inicializado");
   console.log("Buckets do storage garantidos");
   console.log("Curso teste criado: " + course.title);

@@ -2,10 +2,6 @@ import { NextResponse } from "next/server";
 import { prisma } from "@repo/database";
 import { auth } from "@repo/auth";
 import { BUCKETS, getSignedUrl } from "@repo/storage";
-import {
-  canAccessTier,
-  getHighestActivePlanTier,
-} from "@/lib/planTiers";
 import { hasCourseEntitlement } from "@/lib/entitlements";
 
 export const dynamic = "force-dynamic";
@@ -39,10 +35,12 @@ export async function GET(
   const isStaff = role === "ADMIN" || role === "SUPER_ADMIN";
 
   if (!isStaff) {
-    const userTier = await getHighestActivePlanTier(session.user.id);
-    const allowed =
-      canAccessTier(userTier, material.requiredPlan) ||
-      (await hasCourseEntitlement(session.user.id, material.courseId));
+    // Acesso ao material só por entitlement ativo que cobre o módulo do
+    // material. Assinatura legada não concede mais acesso.
+    const allowed = await hasCourseEntitlement(
+      session.user.id,
+      material.courseId,
+    );
     if (!allowed) {
       await prisma.systemLog
         .create({
@@ -52,8 +50,7 @@ export async function GET(
             origin: "material_download",
             description: JSON.stringify({
               materialId: material.id,
-              userTier,
-              requiredPlan: material.requiredPlan,
+              reason: "no_entitlement",
             }),
           },
         })
