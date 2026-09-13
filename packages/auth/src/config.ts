@@ -19,7 +19,13 @@ if (typeof window === "undefined") {
 
 export const authConfig = {
   secret: process.env.AUTH_SECRET,
-  session: { strategy: "jwt" },
+  // Sessão JWT com validade de 7 dias (antes: default de 30) e renovação
+  // diária — reduz a janela de uma sessão roubada/de conta bloqueada.
+  session: {
+    strategy: "jwt",
+    maxAge: 60 * 60 * 24 * 7,
+    updateAge: 60 * 60 * 24,
+  },
   pages: {
     signIn: "/login",
   },

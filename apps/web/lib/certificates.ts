@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { prisma } from "@repo/database";
 import { hasCourseEntitlement } from "./entitlements";
 
@@ -55,7 +56,7 @@ export async function issueCertificateIfEligible(
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { name: true, email: true },
+    select: { name: true },
   });
   if (!user) return null;
 
@@ -63,18 +64,23 @@ export async function issueCertificateIfEligible(
 
   try {
     const cert = await prisma.$transaction(async (tx) => {
-      const counter = await tx.certificateCounter.upsert({
+      // Contador segue só como métrica interna de emissões. O código PÚBLICO
+      // leva um token aleatório — NÃO pode ser sequencial/enumerável, senão
+      // dá pra iterar CERT-AAAA-NNNNN e colher nome+curso de toda a base.
+      await tx.certificateCounter.upsert({
         where: { year },
         update: { lastNumber: { increment: 1 } },
         create: { year, lastNumber: 1 },
       });
-      const publicCode = `CERT-${year}-${String(counter.lastNumber).padStart(5, "0")}`;
+      const token = randomBytes(6).toString("hex").toUpperCase(); // 12 hex
+      const publicCode = `CERT-${year}-${token}`;
       return tx.certificate.create({
         data: {
           publicCode,
           userId,
           courseId,
-          studentName: user.name?.trim() || user.email || "Aluno",
+          // Nunca cai pra e-mail (vazaria PII na página pública de validação).
+          studentName: user.name?.trim() || "Aluno",
           courseTitle: course.title,
         },
       });

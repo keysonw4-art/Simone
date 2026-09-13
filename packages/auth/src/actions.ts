@@ -1,6 +1,7 @@
 "use server";
 
 import { AuthError } from "next-auth";
+import { headers } from "next/headers";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@repo/database";
@@ -91,6 +92,28 @@ export async function signupAction(
   }
 
   const { name, email, password } = parsed.data;
+
+  // Rate limit por IP: barra criação em massa de contas e enumeração
+  // automatizada de e-mails cadastrados.
+  const h = await headers();
+  const origin =
+    h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    h.get("x-real-ip") ||
+    "unknown";
+  const since = new Date(Date.now() - 15 * 60 * 1000);
+  const recentAttempts = await prisma.systemLog.count({
+    where: { event: "signup_attempt", origin, createdAt: { gt: since } },
+  });
+  if (recentAttempts >= 10) {
+    return {
+      errors: {
+        form: "Muitas tentativas de cadastro. Tente novamente em alguns minutos.",
+      },
+    };
+  }
+  await prisma.systemLog
+    .create({ data: { event: "signup_attempt", origin, description: JSON.stringify({ email }) } })
+    .catch(() => {});
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {

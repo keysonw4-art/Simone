@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@repo/database";
 import { getStripe } from "@/lib/stripe";
 import { requireSession } from "@/lib/subscriptionGuard";
+import { getUserAccess, hasCourseEntitlement } from "@/lib/entitlements";
 
 async function getOrigin(): Promise<string> {
   const h = await headers();
@@ -61,13 +62,32 @@ export async function startProductCheckoutAction(
 
   const product = await prisma.product.findFirst({
     where: { id: productId, isActive: true, deletedAt: null },
-    select: { id: true, stripePriceId: true, maxSeats: true, seatsSold: true },
+    select: {
+      id: true,
+      stripePriceId: true,
+      maxSeats: true,
+      seatsSold: true,
+      grantsAll: true,
+      productCourses: { select: { courseId: true } },
+    },
   });
   if (!product || !product.stripePriceId) {
     redirect("/planos?erro=indisponivel");
   }
   if (product.maxSeats != null && product.seatsSold >= product.maxSeats) {
     redirect("/planos?erro=esgotado");
+  }
+
+  // Bloqueia compra duplicada: se o aluno já tem acesso ao que o produto
+  // concede, não deixa pagar de novo.
+  const access = await getUserAccess(sessionUser.id);
+  const alreadyOwns = product.grantsAll
+    ? access.grantsAll
+    : access.grantsAll ||
+      (product.productCourses.length > 0 &&
+        product.productCourses.every((pc) => access.courseIds.has(pc.courseId)));
+  if (alreadyOwns) {
+    redirect("/aluno/cursos?ja=possui");
   }
 
   const user = await loadUserForCheckout(sessionUser.id);
@@ -115,6 +135,11 @@ export async function startModuleCheckoutAction(
   });
   if (!course || !course.standaloneStripePriceId) {
     redirect("/avulsos?erro=indisponivel");
+  }
+
+  // Bloqueia compra duplicada do mesmo módulo.
+  if (await hasCourseEntitlement(sessionUser.id, course.id)) {
+    redirect("/aluno/cursos?ja=possui");
   }
 
   const user = await loadUserForCheckout(sessionUser.id);

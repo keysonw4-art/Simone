@@ -15,6 +15,24 @@ import {
 import { requireAdmin, UnauthorizedError } from "../lib/requireAdmin";
 import { logAuditEvent } from "../lib/audit";
 
+// Whitelist de tipos aceitos como material de curso (PDF, imagens, office, zip).
+const ALLOWED_MATERIAL_MIMES = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "application/zip",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain",
+  "text/csv",
+];
+
 const MetaSchema = z.object({
   title: z
     .string()
@@ -108,7 +126,12 @@ export async function uploadMaterialAction(
   const path = `courses/${courseId}/${material.id}`;
 
   try {
-    await uploadFile({ bucket: BUCKETS.ArquivosAlunos, path, file });
+    await uploadFile({
+      bucket: BUCKETS.ArquivosAlunos,
+      path,
+      file,
+      allowedMimes: ALLOWED_MATERIAL_MIMES,
+    });
   } catch (error) {
     // Rollback: remove a row se upload falhou
     await prisma.material.delete({ where: { id: material.id } });

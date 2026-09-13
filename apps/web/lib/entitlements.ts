@@ -13,8 +13,24 @@ export type UserAccess = {
   courseIds: Set<string>;
 };
 
+const EMPTY_ACCESS: UserAccess = { grantsAll: false, courseIds: new Set() };
+
+/** Usuário existe e não está bloqueado/excluído? (choke point de bloqueio) */
+async function isUserActive(userId: string): Promise<boolean> {
+  const u = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { blockedAt: true, deletedAt: true },
+  });
+  return Boolean(u && !u.blockedAt && !u.deletedAt);
+}
+
 /** Snapshot do acesso ativo do usuário (uma query). */
 export async function getUserAccess(userId: string): Promise<UserAccess> {
+  // Bloqueio/exclusão corta o acesso imediatamente, sem depender da expiração
+  // do JWT (a sessão pode durar dias). Aplicado aqui pois é o choke point de
+  // todo acesso a conteúdo.
+  if (!(await isUserActive(userId))) return { ...EMPTY_ACCESS, courseIds: new Set() };
+
   const now = new Date();
   const entitlements = await prisma.entitlement.findMany({
     where: { userId, expiresAt: { gt: now } },
@@ -35,6 +51,7 @@ export async function hasCourseEntitlement(
   userId: string,
   courseId: string,
 ): Promise<boolean> {
+  if (!(await isUserActive(userId))) return false;
   const now = new Date();
   const found = await prisma.entitlement.findFirst({
     where: {

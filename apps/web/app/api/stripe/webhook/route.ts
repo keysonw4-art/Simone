@@ -192,10 +192,20 @@ async function handlePaymentCheckout(
       }
 
       if (product.maxSeats != null) {
-        await tx.product.update({
-          where: { id: product.id },
+        // Incremento condicional: nunca ultrapassa maxSeats no contador.
+        const inc = await tx.product.updateMany({
+          where: { id: product.id, seatsSold: { lt: product.maxSeats } },
           data: { seatsSold: { increment: 1 } },
         });
+        if (inc.count === 0) {
+          // Vagas esgotaram entre o checkout e o webhook (race). O cliente já
+          // pagou — honramos o acesso concedido acima, mas registramos pro
+          // admin decidir (reembolsar / abrir vaga extra).
+          console.error(
+            "[stripe webhook] Founder oversell — vaga concedida além da quota:",
+            { productId: product.id, userId },
+          );
+        }
       }
     });
 
