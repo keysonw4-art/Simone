@@ -10,7 +10,9 @@ const handler: NextMiddleware = auth((req) => {
   const isAuthRoute =
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/login") ||
-    pathname.startsWith("/signup");
+    pathname.startsWith("/signup") ||
+    pathname.startsWith("/esqueci-senha") ||
+    pathname.startsWith("/redefinir-senha");
   const isPublicRoute =
     pathname === "/" ||
     pathname.startsWith("/planos") ||

@@ -4,6 +4,7 @@ import { AuthError } from "next-auth";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@repo/database";
+import { sendWelcomeEmail } from "@repo/email";
 import { signIn } from "./index";
 
 export type LoginFormState = { error: string } | undefined;
@@ -124,6 +125,9 @@ export async function signupAction(
     console.error("[signup] failed to create user:", error);
     return { errors: { form: "Não foi possível criar a conta. Tente novamente." } };
   }
+
+  // E-mail de boas-vindas (fail-safe: nunca derruba o cadastro).
+  await sendWelcomeEmail({ to: email, name });
 
   const redirectTo =
     (formData.get("redirectTo") as string | null)?.trim() || "/";

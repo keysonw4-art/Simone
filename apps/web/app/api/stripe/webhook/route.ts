@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { prisma } from "@repo/database";
 import type { PlanType } from "@repo/database";
+import { sendPurchaseConfirmationEmail } from "@repo/email";
 import { getStripe } from "@/lib/stripe";
 
 export const runtime = "nodejs";
@@ -147,6 +148,7 @@ async function handlePaymentCheckout(
       where: { id: md.productId },
       select: {
         id: true,
+        name: true,
         accessMonths: true,
         grantsAll: true,
         maxSeats: true,
@@ -196,10 +198,12 @@ async function handlePaymentCheckout(
         });
       }
     });
+
+    await sendPurchaseEmail(userId, product.name, amountCents, expiresAt);
   } else if (kind === "course") {
     const course = await prisma.course.findUnique({
       where: { id: md.courseId },
-      select: { id: true },
+      select: { id: true, title: true },
     });
     if (!course) {
       console.error("[stripe webhook] course avulso não encontrado:", md.courseId);
@@ -230,6 +234,37 @@ async function handlePaymentCheckout(
         },
       });
     });
+
+    await sendPurchaseEmail(userId, course.title, amountCents, expiresAt);
+  }
+}
+
+/**
+ * Dispara a confirmação de compra por e-mail. Fail-safe: qualquer erro é
+ * logado e engolido — nunca falha o webhook (que precisa responder 200 pra
+ * o Stripe não reenviar).
+ */
+async function sendPurchaseEmail(
+  userId: string,
+  itemName: string,
+  amountCents: number,
+  expiresAt: Date,
+): Promise<void> {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, name: true },
+    });
+    if (!user?.email) return;
+    await sendPurchaseConfirmationEmail({
+      to: user.email,
+      name: user.name,
+      itemName,
+      amountCents,
+      expiresAt,
+    });
+  } catch (err) {
+    console.error("[stripe webhook] falha ao enviar e-mail de compra:", err);
   }
 }
 

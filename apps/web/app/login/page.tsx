@@ -86,7 +86,13 @@ export default function LoginPage() {
           <SubmitButton />
         </form>
 
-        <div className="text-center mt-8">
+        <div className="flex flex-col items-center gap-3 mt-8">
+          <Link
+            href="/esqueci-senha"
+            className="text-xs uppercase tracking-widest text-[var(--color-brand-charcoal)]/60 hover:text-[var(--color-brand-sage)] transition-colors"
+          >
+            Esqueci minha senha
+          </Link>
           <a
             href="/signup"
             className="text-xs uppercase tracking-widest text-[var(--color-brand-charcoal)]/60 hover:text-[var(--color-brand-sage)] transition-colors"

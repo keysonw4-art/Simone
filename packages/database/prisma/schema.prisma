@@ -125,6 +125,23 @@ model User {
   ticketMessages TicketMessage[] @relation("message_author")
   certificates   Certificate[]
   favorites      Favorite[]
+  passwordResetTokens PasswordResetToken[]
+}
+
+/// Token de redefinição de senha ("esqueci minha senha").
+/// Guarda apenas o HASH do token (nunca o valor cru); o link enviado por
+/// e-mail carrega o valor cru, validado por sha256 na volta.
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model PublicIdCounter {
@@ -458,6 +475,10 @@ model Entitlement {
   purchase   Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
+
+  // Marca quando o aviso "seu acesso expira em breve" (7 dias) foi enviado,
+  // pro cron não reenviar. Reset implícito: novo entitlement = novo registro.
+  expiryWarnedAt DateTime?
 
   @@index([userId])
   @@index([userId, courseId])
