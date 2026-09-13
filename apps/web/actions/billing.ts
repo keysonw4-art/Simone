@@ -81,6 +81,8 @@ export async function startProductCheckoutAction(
     customer: customerId,
     line_items: [{ price: product.stripePriceId, quantity: 1 }],
     locale: "pt-BR",
+    // Deixa o cliente escolher à vista ou parcelado (cartões BR elegíveis).
+    payment_method_options: { card: { installments: { enabled: true } } },
     metadata: meta,
     payment_intent_data: { metadata: meta },
     success_url: `${origin}/aluno/cursos?compra=sucesso`,
@@ -126,6 +128,7 @@ export async function startModuleCheckoutAction(
     customer: customerId,
     line_items: [{ price: course.standaloneStripePriceId, quantity: 1 }],
     locale: "pt-BR",
+    payment_method_options: { card: { installments: { enabled: true } } },
     metadata: meta,
     payment_intent_data: { metadata: meta },
     success_url: `${origin}/aluno/cursos?compra=sucesso`,

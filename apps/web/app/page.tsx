@@ -48,11 +48,12 @@ const STEPS = [
 ];
 
 export default async function Home() {
-  const plans = await prisma.plan.findMany({
+  const plans = await prisma.product.findMany({
     where: { isActive: true, deletedAt: null },
     orderBy: { order: "asc" },
     select: {
       id: true,
+      slug: true,
       name: true,
       tagline: true,
       priceCents: true,
@@ -94,8 +95,14 @@ export default async function Home() {
               href="#planos"
               className="hover:text-[var(--color-brand-gold)] transition-colors"
             >
-              Planos
+              Cursos
             </a>
+            <Link
+              href="/avulsos"
+              className="hover:text-[var(--color-brand-gold)] transition-colors"
+            >
+              Avulsos
+            </Link>
             <Link
               href="/aluno/suporte"
               className="hover:text-[var(--color-brand-gold)] transition-colors"
@@ -221,16 +228,16 @@ export default async function Home() {
                       {plan.tagline}
                     </p>
                   )}
-                  <div className="flex items-baseline gap-1.5 mb-8">
-                    <span className="font-serif text-4xl text-[var(--color-brand-charcoal)]">
+                  <div className="mb-8">
+                    <div className="font-serif text-4xl text-[var(--color-brand-charcoal)]">
                       {formatBRL(plan.priceCents)}
-                    </span>
-                    <span className="text-xs uppercase tracking-widest text-[var(--color-brand-charcoal)]/50">
-                      / mês
-                    </span>
+                    </div>
+                    <p className="text-xs text-[var(--color-brand-charcoal)]/60 mt-1">
+                      ou 10x de {formatBRL(Math.round(plan.priceCents / 10))}
+                    </p>
                   </div>
                   <Link
-                    href="/planos"
+                    href={`/planos/${plan.slug}`}
                     className={`mt-auto block text-center px-6 py-3.5 text-xs font-semibold uppercase tracking-[0.2em] rounded-sm transition-colors ${
                       plan.highlight
                         ? "bg-[var(--color-brand-gold)] text-white hover:bg-[var(--color-brand-charcoal)]"
@@ -244,12 +251,19 @@ export default async function Home() {
             ))}
           </div>
 
-          <Reveal className="mt-10">
+          <Reveal className="mt-10 flex flex-col sm:flex-row gap-x-8 gap-y-3">
             <Link
               href="/planos"
               className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-[var(--color-brand-charcoal)]/60 hover:text-[var(--color-brand-sage)] transition-colors"
             >
-              Comparar todos os planos
+              Comparar todos os cursos
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+            <Link
+              href="/avulsos"
+              className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-[var(--color-brand-charcoal)]/60 hover:text-[var(--color-brand-sage)] transition-colors"
+            >
+              Ou compre módulos avulsos
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </Reveal>
@@ -294,8 +308,11 @@ export default async function Home() {
               Método
             </a>
             <a href="#planos" className="hover:text-[var(--color-brand-sage)] transition-colors">
-              Planos
+              Cursos
             </a>
+            <Link href="/avulsos" className="hover:text-[var(--color-brand-sage)] transition-colors">
+              Avulsos
+            </Link>
             <Link href="/login" className="hover:text-[var(--color-brand-sage)] transition-colors">
               Área do Aluno
             </Link>

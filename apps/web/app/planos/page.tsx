@@ -2,7 +2,6 @@ import Link from "next/link";
 import { auth } from "@repo/auth";
 import { prisma } from "@repo/database";
 import { ArrowLeft, Check, Award, Sparkles } from "lucide-react";
-import { startProductCheckoutAction } from "@/actions/billing";
 import { getUserAccess } from "@/lib/entitlements";
 
 function formatBRL(cents: number): string {
@@ -141,6 +140,9 @@ export default async function PlanosPage({
                         {formatBRL(p.priceCents)}
                       </span>
                     </div>
+                    <p className="text-xs text-[var(--color-brand-charcoal)]/60 mb-1">
+                      ou 10x de {formatBRL(Math.round(p.priceCents / 10))}
+                    </p>
                     <p className="text-[11px] uppercase tracking-widest text-[var(--color-brand-charcoal)]/50 mb-6">
                       {p.accessMonths} meses de acesso
                     </p>
@@ -174,37 +176,23 @@ export default async function PlanosPage({
 
                     <div className="mt-auto pt-2">
                       {owned ? (
-                        <div className="w-full px-6 py-3.5 text-center text-xs font-semibold uppercase tracking-[0.2em] rounded-sm border border-[var(--color-brand-sage)]/30 text-[var(--color-brand-sage)]">
-                          Você já tem acesso
-                        </div>
-                      ) : !isLogged ? (
                         <Link
-                          href="/signup"
-                          className="block text-center w-full px-6 py-3.5 text-xs font-semibold uppercase tracking-[0.2em] rounded-sm bg-[var(--color-brand-sage)] text-white hover:bg-[var(--color-brand-charcoal)] transition-colors"
+                          href="/aluno/cursos"
+                          className="block text-center w-full px-6 py-3.5 text-xs font-semibold uppercase tracking-[0.2em] rounded-sm border border-[var(--color-brand-sage)]/30 text-[var(--color-brand-sage)] hover:bg-[var(--color-brand-sage)]/5 transition-colors"
                         >
-                          Criar conta
+                          Você já tem acesso
                         </Link>
-                      ) : soldOut || !p.stripePriceId ? (
-                        <button
-                          type="button"
-                          disabled
-                          className="w-full px-6 py-3.5 text-xs font-semibold uppercase tracking-[0.2em] rounded-sm bg-[var(--color-brand-charcoal)]/20 text-white cursor-not-allowed"
-                        >
-                          {soldOut ? "Esgotado" : "Em breve"}
-                        </button>
                       ) : (
-                        <form action={startProductCheckoutAction.bind(null, p.id)}>
-                          <button
-                            type="submit"
-                            className={`w-full px-6 py-3.5 text-xs font-semibold uppercase tracking-[0.2em] rounded-sm transition-colors ${
-                              p.highlight
-                                ? "bg-[var(--color-brand-gold)] text-white hover:bg-[var(--color-brand-charcoal)]"
-                                : "bg-[var(--color-brand-sage)] text-white hover:bg-[var(--color-brand-charcoal)]"
-                            }`}
-                          >
-                            Comprar
-                          </button>
-                        </form>
+                        <Link
+                          href={`/planos/${p.slug}`}
+                          className={`block text-center w-full px-6 py-3.5 text-xs font-semibold uppercase tracking-[0.2em] rounded-sm transition-colors ${
+                            p.highlight
+                              ? "bg-[var(--color-brand-gold)] text-white hover:bg-[var(--color-brand-charcoal)]"
+                              : "bg-[var(--color-brand-sage)] text-white hover:bg-[var(--color-brand-charcoal)]"
+                          }`}
+                        >
+                          Ver detalhes
+                        </Link>
                       )}
                     </div>
                   </div>
