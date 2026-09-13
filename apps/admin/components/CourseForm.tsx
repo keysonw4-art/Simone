@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { slugify } from "../lib/slug";
+import { centsToReaisInput } from "../lib/money";
 import type { CourseFormState } from "../actions/courses";
 
 function SubmitButton({ label }: { label: string }) {
@@ -231,19 +232,18 @@ export function CourseForm({
 
         <div className="flex flex-col gap-2 max-w-xs">
           <label className="text-xs uppercase tracking-widest text-[var(--color-brand-charcoal)]/70 font-medium">
-            Preço avulso (centavos)
+            Preço avulso (R$)
           </label>
           <input
-            type="number"
+            type="text"
+            inputMode="decimal"
             name="standalonePriceCents"
-            min={0}
-            step={1}
-            defaultValue={defaultValues?.standalonePriceCents ?? ""}
+            defaultValue={centsToReaisInput(defaultValues?.standalonePriceCents)}
             className="w-full bg-white border border-black/10 rounded-sm px-4 py-3 text-[var(--color-brand-charcoal)] focus:outline-none focus:border-[var(--color-brand-sage)] transition-colors font-mono"
-            placeholder="19700"
+            placeholder="197,00"
           />
           <span className="text-[10px] text-[var(--color-brand-charcoal)]/50">
-            Ex.: 19700 = R$ 197,00. Só usado se "vender avulso" estiver marcado.
+            Em reais. Ex.: 197 ou 197,00. Só usado se "vender avulso" estiver marcado.
           </span>
           {errors?.standalonePriceCents && (
             <span className="text-red-500 text-[10px] font-medium">

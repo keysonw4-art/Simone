@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { slugify } from "../lib/slug";
+import { centsToReaisInput } from "../lib/money";
 import type { ProductFormState } from "../actions/products";
 
 function SubmitButton({ label }: { label: string }) {
@@ -119,18 +120,18 @@ export function ProductForm({ action, defaultValues, submitLabel, successMessage
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="flex flex-col gap-2">
-          <label className={labelCls}>Preço (centavos)</label>
+          <label className={labelCls}>Preço (R$)</label>
           <input
-            type="number"
+            type="text"
+            inputMode="decimal"
             name="priceCents"
             required
-            min={0}
-            defaultValue={defaultValues?.priceCents ?? ""}
+            defaultValue={centsToReaisInput(defaultValues?.priceCents)}
             className={`${inputCls} font-mono`}
-            placeholder="200000"
+            placeholder="2000,00"
           />
           <span className="text-[10px] text-[var(--color-brand-charcoal)]/50">
-            200000 = R$ 2.000
+            Em reais. Ex.: 2000 ou 2.000,00
           </span>
           {errors?.priceCents && <span className={errCls}>{errors.priceCents}</span>}
         </div>

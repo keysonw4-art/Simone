@@ -7,6 +7,7 @@ import { Prisma, prisma } from "@repo/database";
 import { requireAdmin, UnauthorizedError } from "../lib/requireAdmin";
 import { logAuditEvent } from "../lib/audit";
 import { randomSlugSuffix, slugify } from "../lib/slug";
+import { reaisToCents } from "../lib/money";
 
 const CourseSchema = z.object({
   title: z
@@ -55,8 +56,8 @@ const CourseSchema = z.object({
   standalonePriceCents: z
     .string()
     .trim()
-    .regex(/^\d*$/, "Preço deve ser um número inteiro em centavos")
-    .max(9)
+    .regex(/^[\d.,\sR$]*$/, "Preço inválido")
+    .max(20)
     .optional()
     .or(z.literal("")),
   standaloneStripePriceId: z
@@ -140,9 +141,7 @@ function commercialData(d: {
       : null,
     workloadHours: d.workloadHours ? parseInt(d.workloadHours, 10) : null,
     soldStandalone: d.soldStandalone,
-    standalonePriceCents: d.standalonePriceCents
-      ? parseInt(d.standalonePriceCents, 10)
-      : null,
+    standalonePriceCents: reaisToCents(d.standalonePriceCents ?? ""),
     standaloneStripePriceId: d.standaloneStripePriceId || null,
   };
 }

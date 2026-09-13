@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { Prisma, prisma } from "@repo/database";
 import { requireAdmin, UnauthorizedError } from "../lib/requireAdmin";
 import { logAuditEvent } from "../lib/audit";
+import { reaisToCents } from "../lib/money";
 
 const ProductSchema = z.object({
   name: z.string().trim().min(2, "Nome deve ter ao menos 2 caracteres").max(80),
@@ -21,9 +22,9 @@ const ProductSchema = z.object({
   priceCents: z
     .string()
     .trim()
-    .regex(/^\d+$/, "Preço em centavos (inteiro)")
-    .transform((v) => parseInt(v, 10))
-    .pipe(z.number().int().min(0).max(99999999)),
+    .min(1, "Informe o preço")
+    .transform((v) => reaisToCents(v) ?? -1)
+    .pipe(z.number().int().min(0, "Preço inválido").max(99999999)),
   accessMonths: z
     .string()
     .trim()
