@@ -1,4 +1,5 @@
--- Additive and rerunnable; compatible with the previous deployment.
+-- Rerunnable migration; preserves existing rows. After product certificates are
+-- issued, do not roll back to an application requiring Certificate.courseId.
 -- SQL is required for RLS/privileges, which Prisma schema cannot represent.
 ALTER TABLE public."PasswordResetToken" ENABLE ROW LEVEL SECURITY;
 -- statement

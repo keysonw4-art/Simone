@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs";
 import { authConfig } from "./config";
 import { extractIp, logLoginFailure } from "./logging";
 import { checkLoginRateLimit } from "./rateLimit";
-import { EmailSchema } from './security';
+import { EmailSchema } from "./security";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -13,12 +13,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     ...authConfig.callbacks,
     async jwt(params) {
       const token = await authConfig.callbacks.jwt(params);
-      if (!token || typeof token.id !== 'string' || typeof token.sessionVersion !== 'number') return null;
+      if (
+        !token ||
+        typeof token.id !== "string" ||
+        typeof token.sessionVersion !== "number"
+      )
+        return null;
       const user = await prisma.user.findUnique({
         where: { id: token.id },
-        select: { role: true, sessionVersion: true, blockedAt: true, deletedAt: true },
+        select: {
+          role: true,
+          sessionVersion: true,
+          blockedAt: true,
+          deletedAt: true,
+        },
       });
-      if (!user || user.blockedAt || user.deletedAt || user.sessionVersion !== token.sessionVersion) return null;
+      if (
+        !user ||
+        user.blockedAt ||
+        user.deletedAt ||
+        user.sessionVersion !== token.sessionVersion
+      )
+        return null;
       token.role = user.role;
       return token;
     },
@@ -34,7 +50,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const parsedEmail = EmailSchema.safeParse(credentials?.email);
         const email = parsedEmail.success ? parsedEmail.data : null;
 
-        if (!email || typeof credentials?.password !== 'string' || !credentials.password || Buffer.byteLength(credentials.password, 'utf8') > 72) {
+        if (
+          !email ||
+          typeof credentials?.password !== "string" ||
+          !credentials.password ||
+          Buffer.byteLength(credentials.password, "utf8") > 72
+        ) {
           return null;
         }
 
@@ -94,6 +115,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             userId: user.id,
           });
           return null;
+        }
+
+        // Upgrade legacy bcrypt work factors only after successful authentication.
+        // Conditional write must never overwrite a simultaneous password reset.
+        if (bcrypt.getRounds(user.passwordHash) < 12) {
+          const upgradedHash = await bcrypt.hash(credentials.password, 12);
+          await prisma.user.updateMany({
+            where: {
+              id: user.id,
+              passwordHash: user.passwordHash,
+              sessionVersion: user.sessionVersion,
+              blockedAt: null,
+              deletedAt: null,
+            },
+            data: { passwordHash: upgradedHash },
+          });
         }
 
         return {

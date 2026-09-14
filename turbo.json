@@ -20,7 +20,11 @@
     "NEXT_PUBLIC_SITE_URL",
     "NEXT_PUBLIC_TRAILER_VIMEO_ID"
   ],
-  "globalDependencies": [".env"],
+  "globalDependencies": [
+    ".env",
+    "eslint.config.mjs",
+    "packages/eslint-config/**"
+  ],
   "tasks": {
     "@repo/database#build": { "cache": false, "outputs": [] },
     "build": {
