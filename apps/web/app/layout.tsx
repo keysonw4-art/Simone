@@ -10,6 +10,9 @@ const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-didot"
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://simone-site-web.vercel.app";
 
+// Per-request CSP nonces require dynamic rendering, including public catalog pages.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {

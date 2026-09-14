@@ -69,6 +69,7 @@ model User {
   passwordHash String?
   name         String?
   role         Role    @default(STUDENT)
+  sessionVersion Int   @default(0)
 
   // LGPD
   acceptedTermsAt DateTime?
@@ -108,6 +109,7 @@ model PasswordResetToken {
   userId    String
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   tokenHash String    @unique
+  sessionVersion Int  @default(-1)
   expiresAt DateTime
   usedAt    DateTime?
   createdAt DateTime  @default(now())
@@ -217,8 +219,10 @@ model Certificate {
   publicCode String @unique // CERT-2026-00001
   userId     String
   user       User   @relation(fields: [userId], references: [id])
-  courseId   String
-  course     Course @relation(fields: [courseId], references: [id])
+  courseId   String?
+  course     Course? @relation(fields: [courseId], references: [id])
+  productId  String?
+  product    Product? @relation(fields: [productId], references: [id])
 
   // Snapshots (imutáveis pós-emissão)
   studentName String
@@ -231,6 +235,7 @@ model Certificate {
   issuedAt DateTime @default(now())
 
   @@unique([userId, courseId])
+  @@unique([userId, productId])
   @@index([publicCode])
 }
 
@@ -365,6 +370,7 @@ model Product {
 
   productCourses ProductCourse[]
   purchases      Purchase[]
+  certificates   Certificate[]
 
   @@index([isActive, order])
 }
@@ -398,6 +404,13 @@ model Purchase {
 
   stripeCheckoutSessionId String? @unique
   stripePaymentIntentId   String? @unique
+  pendingKey             String? @unique
+  checkoutExpiresAt      DateTime?
+  checkoutUrl            String?
+  snapshot               Json?
+  accessSuspended        Boolean @default(false)
+  refundedCents          Int     @default(0)
+  paymentEventAt         BigInt  @default(0)
 
   purchasedAt DateTime?
   expiresAt   DateTime?
@@ -408,6 +421,7 @@ model Purchase {
   entitlements Entitlement[]
 
   @@index([userId, status])
+  @@index([productId, status, checkoutExpiresAt])
 }
 
 // Direito de acesso materializado. É o que a checagem de acesso consulta.
@@ -433,4 +447,31 @@ model Entitlement {
   @@index([userId])
   @@index([userId, courseId])
   @@index([expiresAt])
+}
+
+// Atomic, bounded counters; keys contain hashes, never raw emails/IPs.
+model RateLimit {
+  key       String   @id
+  hits      Int
+  expiresAt DateTime
+  @@index([expiresAt])
+}
+
+// Durable delivery state. Payloads are reconstructed from authoritative records.
+model EmailDelivery {
+  key         String   @id
+  leaseUntil  DateTime?
+  leaseToken  String?
+  sentAt      DateTime?
+  attempts    Int      @default(0)
+  createdAt   DateTime @default(now())
+  @@index([sentAt, leaseUntil])
+}
+
+// Durable cursor and lease for bounded, resumable scheduled work.
+model JobState {
+  key        String @id
+  cursor     String?
+  leaseUntil DateTime?
+  leaseToken String?
 }

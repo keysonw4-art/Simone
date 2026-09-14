@@ -1,3 +1,4 @@
+import { requireAdminPage } from "@/lib/requireAdmin";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, UserCircle } from "lucide-react";
@@ -15,6 +16,7 @@ export default async function AlunoDetalhesPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireAdminPage();
   const { id } = await params;
   const session = await auth();
   const currentAdminId = session?.user?.id;

@@ -1,3 +1,4 @@
+import { requireAdminPage } from "@/lib/requireAdmin";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, Plus } from "lucide-react";
@@ -15,6 +16,7 @@ export default async function EditarModuloPage({
 }: {
   params: Promise<{ id: string; moduleId: string }>;
 }) {
+  await requireAdminPage();
   const { id, moduleId } = await params;
 
   const course = await prisma.course.findFirst({

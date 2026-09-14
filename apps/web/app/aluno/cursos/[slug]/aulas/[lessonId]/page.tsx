@@ -42,11 +42,11 @@ export default async function LessonPage({
   let currentLesson = null;
   let currentModule = null;
 
-  for (const module of course.modules) {
-    const lesson = module.lessons.find((l) => l.id === resolvedParams.lessonId);
+  for (const section of course.modules) {
+    const lesson = section.lessons.find((l) => l.id === resolvedParams.lessonId);
     if (lesson) {
       currentLesson = lesson;
-      currentModule = module;
+      currentModule = section;
       break;
     }
   }

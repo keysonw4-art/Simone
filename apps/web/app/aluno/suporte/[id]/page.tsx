@@ -1,3 +1,4 @@
+import { Pagination, parsePage, PAGE_SIZE } from "@repo/ui/pagination";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -14,20 +15,24 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 
 export default async function TicketDetailPage({
   params,
+  searchParams,
 }: {
+  searchParams: Promise<{ page?: string }>;
   params: Promise<{ id: string }>;
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
   const { id } = await params;
+  const page = parsePage((await searchParams).page);
 
   const ticket = await prisma.supportTicket.findFirst({
     where: { id, userId: session.user.id, deletedAt: null },
     include: {
       messages: {
         where: { isInternal: false },
-        orderBy: { createdAt: "asc" },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: PAGE_SIZE + 1, skip: (page - 1) * PAGE_SIZE,
         include: {
           author: { select: { id: true, name: true, role: true } },
         },
@@ -69,7 +74,7 @@ export default async function TicketDetailPage({
       </header>
 
       <div className="flex flex-col gap-4 mb-10">
-        {ticket.messages.map((msg) => {
+        {[...ticket.messages.slice(0, PAGE_SIZE)].reverse().map((msg) => {
           const isStaff =
             msg.author.role === "ADMIN" ||
             msg.author.role === "SUPER_ADMIN" ||
@@ -108,6 +113,7 @@ export default async function TicketDetailPage({
       ) : (
         <SupportReplyForm ticketId={ticket.id} />
       )}
+      <Pagination page={page} hasMore={ticket.messages.length > PAGE_SIZE} href={`/aluno/suporte/${ticket.id}`} />
     </div>
   );
 }

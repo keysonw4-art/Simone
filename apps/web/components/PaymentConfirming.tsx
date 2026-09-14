@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
@@ -41,16 +42,16 @@ export function PaymentConfirming() {
       ) : (
         <>
           <p className="text-sm text-[var(--color-brand-charcoal)]/80 mb-1">
-            Pagamento recebido, liberando seu acesso.
+            Ainda não conseguimos confirmar a liberação do seu acesso.
           </p>
           <p className="text-xs text-[var(--color-brand-charcoal)]/50">
             Se o conteúdo não aparecer em instantes, atualize a página. Persistindo,{" "}
-            <a
+            <Link
               href="/aluno/suporte"
               className="text-[var(--color-brand-sage)] underline underline-offset-2"
             >
               fale com o suporte
-            </a>
+            </Link>
             .
           </p>
         </>

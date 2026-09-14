@@ -15,6 +15,7 @@ export async function sendEmail(params: {
   subject: string;
   html: string;
   replyTo?: string;
+  idempotencyKey?: string;
 }): Promise<SendResult> {
   const resend = getResend();
   if (!resend) {
@@ -31,7 +32,7 @@ export async function sendEmail(params: {
       subject: params.subject,
       html: params.html,
       replyTo: params.replyTo ?? REPLY_TO,
-    });
+    }, params.idempotencyKey ? { idempotencyKey: params.idempotencyKey } : undefined);
 
     if (error) {
       console.error(`[email] Resend recusou "${params.subject}":`, error);

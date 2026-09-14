@@ -1,165 +1,107 @@
 "use server";
 
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@repo/database";
+import { appUrl } from "@repo/email";
+import { IdSchema, consumeRateLimit } from "@repo/auth/security";
 import { getStripe } from "@/lib/stripe";
 import { requireSession } from "@/lib/subscriptionGuard";
-import { getUserAccess, hasCourseEntitlement } from "@/lib/entitlements";
+import { getUserAccess } from "@/lib/entitlements";
+import { PurchaseSnapshotSchema, type PurchaseSnapshot } from "@/lib/commerce";
 
-async function getOrigin(): Promise<string> {
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3001";
-  const proto = h.get("x-forwarded-proto") ?? "https";
-  return `${proto}://${host}`;
-}
-
-/**
- * Garante um Stripe Customer para o usuário (cria e persiste na 1ª vez).
- */
-async function getOrCreateCustomer(user: {
-  id: string;
-  email: string | null;
-  name: string | null;
-  stripeCustomerId: string | null;
-}): Promise<string> {
-  if (user.stripeCustomerId) return user.stripeCustomerId;
-
+async function startCheckout(kind: "product" | "course", id: string) {
+  const user = await requireSession();
+  if (user.role === "ADMIN" || user.role === "SUPER_ADMIN") redirect("/aluno");
+  const catalog = kind === "product" ? "/planos" : "/avulsos";
+  if (!IdSchema.safeParse(id).success) redirect(catalog + "?erro=indisponivel");
+  if (!await consumeRateLimit("checkout", user.id, 10, 600)) redirect(catalog + "?erro=limite");
   const stripe = getStripe();
-  const customer = await stripe.customers.create({
-    email: user.email ?? undefined,
-    name: user.name ?? undefined,
-    metadata: { userId: user.id },
-  });
+  const snapshot = await loadOffer(kind, id);
+  if (!snapshot) redirect(catalog + "?erro=indisponivel");
+  const access = await getUserAccess(user.id);
+  if (access.grantsAll || (!snapshot.grantsAll && snapshot.courseIds.every(c => access.courseIds.has(c)))) redirect("/aluno/cursos?ja=possui");
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { stripeCustomerId: customer.id },
-  });
-
-  return customer.id;
-}
-
-async function loadUserForCheckout(userId: string) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, email: true, name: true, stripeCustomerId: true },
-  });
-  if (!user) redirect("/login");
-  return user;
-}
-
-/**
- * Modelo v2 — checkout de pagamento único de um Curso (produto).
- */
-export async function startProductCheckoutAction(
-  productId: string,
-): Promise<void> {
-  const sessionUser = await requireSession();
-  if (sessionUser.role === "ADMIN" || sessionUser.role === "SUPER_ADMIN") {
-    redirect("/aluno");
+  // The public price and Stripe Price must describe the same one-time purchase.
+  const price = await stripe.prices.retrieve(snapshot.priceId);
+  if (!price.active || price.type !== "one_time" || price.currency !== snapshot.currency || price.unit_amount !== snapshot.priceCents) {
+    console.error("[checkout] price mismatch", { kind, id });
+    redirect(catalog + "?erro=preco");
   }
 
-  const product = await prisma.product.findFirst({
-    where: { id: productId, isActive: true, deletedAt: null },
-    select: {
-      id: true,
-      stripePriceId: true,
-      maxSeats: true,
-      seatsSold: true,
-      grantsAll: true,
-      productCourses: { select: { courseId: true } },
-    },
+  const pendingKey = user.id + ":" + kind + ":" + id;
+  const purchase = await prisma.$transaction(async tx => {
+    // Transaction-scoped lock works with the Supabase transaction pooler.
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${"checkout:" + kind + ":" + id}, 0))::text`;
+    const now = new Date();
+    await tx.purchase.updateMany({
+      where: { pendingKey, status: "PENDING", checkoutExpiresAt: { lte: now } },
+      data: { pendingKey: null },
+    });
+    const existing = await tx.purchase.findUnique({ where: { pendingKey } });
+    if (existing) return existing;
+    if (kind === "product") {
+      const current = await tx.product.findFirst({ where: { id, deletedAt: null, isActive: true } });
+      if (!current) return null;
+      if (current.maxSeats !== null) {
+        const reserved = await tx.purchase.count({ where: { productId: id,
+          OR: [{ status: "PAID" }, { status: "PENDING", checkoutExpiresAt: { gt: now } }] } });
+        if (reserved >= current.maxSeats) return null;
+      }
+    }
+    return tx.purchase.create({ data: {
+      userId: user.id, productId: kind === "product" ? id : null, courseId: kind === "course" ? id : null,
+      amountCents: snapshot.priceCents, pendingKey, snapshot,
+      checkoutExpiresAt: new Date(Date.now() + 31 * 60_000),
+    } });
   });
-  if (!product || !product.stripePriceId) {
-    redirect("/planos?erro=indisponivel");
+  if (!purchase) redirect(catalog + "?erro=esgotado");
+  if (purchase.status !== "PENDING") redirect("/aluno/cursos?ja=possui");
+  if (purchase.checkoutUrl) redirect(purchase.checkoutUrl);
+  const offer = PurchaseSnapshotSchema.parse(purchase.snapshot);
+  const account = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+  let customerId = account.stripeCustomerId;
+  if (!customerId) {
+    const customer = await stripe.customers.create({ email: account.email, metadata: { userId: user.id } },
+      { idempotencyKey: "customer-v1-" + user.id });
+    customerId = customer.id;
+    await prisma.user.update({ where: { id: user.id }, data: { stripeCustomerId: customerId } });
   }
-  if (product.maxSeats != null && product.seatsSold >= product.maxSeats) {
-    redirect("/planos?erro=esgotado");
-  }
-
-  // Bloqueia compra duplicada: se o aluno já tem acesso ao que o produto
-  // concede, não deixa pagar de novo.
-  const access = await getUserAccess(sessionUser.id);
-  const alreadyOwns = product.grantsAll
-    ? access.grantsAll
-    : access.grantsAll ||
-      (product.productCourses.length > 0 &&
-        product.productCourses.every((pc) => access.courseIds.has(pc.courseId)));
-  if (alreadyOwns) {
-    redirect("/aluno/cursos?ja=possui");
-  }
-
-  const user = await loadUserForCheckout(sessionUser.id);
-  const customerId = await getOrCreateCustomer(user);
-  const origin = await getOrigin();
-  const stripe = getStripe();
-
-  const meta = { userId: user.id, kind: "product", productId: product.id };
+  const metadata = { userId: user.id, purchaseId: purchase.id, kind, [kind === "product" ? "productId" : "courseId"]: id };
   const checkout = await stripe.checkout.sessions.create({
-    mode: "payment",
-    customer: customerId,
-    line_items: [{ price: product.stripePriceId, quantity: 1 }],
-    locale: "pt-BR",
-    // Deixa o cliente escolher à vista ou parcelado (cartões BR elegíveis).
+    mode: "payment", customer: customerId, client_reference_id: purchase.id,
+    line_items: [{ price: offer.priceId, quantity: 1 }], locale: "pt-BR",
+    payment_method_types: ["card"],
     payment_method_options: { card: { installments: { enabled: true } } },
-    metadata: meta,
-    payment_intent_data: { metadata: meta },
-    success_url: `${origin}/aluno/cursos?compra=sucesso`,
-    cancel_url: `${origin}/planos?checkout=cancelado`,
-  });
-
-  if (!checkout.url) redirect("/planos?erro=checkout");
+    metadata, payment_intent_data: { metadata },
+    expires_at: Math.floor(purchase.checkoutExpiresAt!.getTime() / 1000) - 30,
+    success_url: appUrl() + "/aluno/cursos?compra=sucesso",
+    cancel_url: appUrl() + catalog + "?checkout=cancelado",
+  }, { idempotencyKey: "checkout-v1-" + purchase.id });
+  if (!checkout.url) redirect(catalog + "?erro=checkout");
+  await prisma.purchase.update({ where: { id: purchase.id }, data: {
+    stripeCheckoutSessionId: checkout.id, checkoutUrl: checkout.url,
+  } });
   redirect(checkout.url);
 }
 
-/**
- * Modelo v2 — checkout de pagamento único de um Módulo avulso.
- */
-export async function startModuleCheckoutAction(
-  courseId: string,
-): Promise<void> {
-  const sessionUser = await requireSession();
-  if (sessionUser.role === "ADMIN" || sessionUser.role === "SUPER_ADMIN") {
-    redirect("/aluno");
+async function loadOffer(kind: "product" | "course", id: string): Promise<PurchaseSnapshot | null> {
+  if (kind === "course") {
+    const c = await prisma.course.findFirst({ where: { id, deletedAt: null, isArchived: false, soldStandalone: true } });
+    if (!c?.standaloneStripePriceId || !c.standalonePriceCents) return null;
+    return PurchaseSnapshotSchema.parse({ version: 1, kind, id, name: c.title, priceId: c.standaloneStripePriceId,
+      priceCents: c.standalonePriceCents, currency: "brl", accessMonths: 12, grantsAll: false,
+      courseIds: [id], certificateType: "DECLARATION" });
   }
-
-  const course = await prisma.course.findFirst({
-    where: {
-      id: courseId,
-      deletedAt: null,
-      isArchived: false,
-      soldStandalone: true,
-    },
-    select: { id: true, standaloneStripePriceId: true },
-  });
-  if (!course || !course.standaloneStripePriceId) {
-    redirect("/avulsos?erro=indisponivel");
-  }
-
-  // Bloqueia compra duplicada do mesmo módulo.
-  if (await hasCourseEntitlement(sessionUser.id, course.id)) {
-    redirect("/aluno/cursos?ja=possui");
-  }
-
-  const user = await loadUserForCheckout(sessionUser.id);
-  const customerId = await getOrCreateCustomer(user);
-  const origin = await getOrigin();
-  const stripe = getStripe();
-
-  const meta = { userId: user.id, kind: "course", courseId: course.id };
-  const checkout = await stripe.checkout.sessions.create({
-    mode: "payment",
-    customer: customerId,
-    line_items: [{ price: course.standaloneStripePriceId, quantity: 1 }],
-    locale: "pt-BR",
-    payment_method_options: { card: { installments: { enabled: true } } },
-    metadata: meta,
-    payment_intent_data: { metadata: meta },
-    success_url: `${origin}/aluno/cursos?compra=sucesso`,
-    cancel_url: `${origin}/avulsos?checkout=cancelado`,
-  });
-
-  if (!checkout.url) redirect("/avulsos?erro=checkout");
-  redirect(checkout.url);
+  const p = await prisma.product.findFirst({ where: { id, deletedAt: null, isActive: true },
+    include: { productCourses: { include: { course: true } } } });
+  if (!p?.stripePriceId || !p.priceCents) return null;
+  const courseIds = p.productCourses.filter(c => !c.course.deletedAt && !c.course.isArchived).map(c => c.courseId);
+  // ALL access does not imply that every future module belongs to the certificate curriculum.
+  if (!p.grantsAll && !courseIds.length) return null;
+  return PurchaseSnapshotSchema.parse({ version: 1, kind, id, name: p.name, priceId: p.stripePriceId,
+    priceCents: p.priceCents, currency: "brl", accessMonths: p.accessMonths, grantsAll: p.grantsAll,
+    courseIds, certificateType: p.certificateType });
 }
+
+export async function startProductCheckoutAction(productId: string): Promise<void> { await startCheckout("product", productId); }
+export async function startModuleCheckoutAction(courseId: string): Promise<void> { await startCheckout("course", courseId); }

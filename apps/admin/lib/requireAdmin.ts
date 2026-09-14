@@ -1,4 +1,14 @@
 import { auth } from "@repo/auth";
+import { prisma } from '@repo/database';
+import { redirect } from 'next/navigation';
+
+export async function requireAdminPage() {
+  try { return await requireAdmin(); }
+  catch (error) {
+    if (error instanceof UnauthorizedError) redirect('/login');
+    throw error;
+  }
+}
 
 export class UnauthorizedError extends Error {
   constructor(message = "Unauthorized") {
@@ -14,7 +24,11 @@ export async function requireAdmin(): Promise<{
   role: "ADMIN" | "SUPER_ADMIN";
 }> {
   const session = await auth();
-  const user = session?.user;
+  const claim = session?.user;
+  const user = claim && await prisma.user.findFirst({
+    where: { id: claim.id, sessionVersion: claim.sessionVersion, blockedAt: null, deletedAt: null },
+    select: { id: true, email: true, name: true, role: true },
+  });
 
   if (!user || (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN")) {
     throw new UnauthorizedError();

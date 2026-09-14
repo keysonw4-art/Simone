@@ -1,3 +1,4 @@
+import { Pagination, parsePage, PAGE_SIZE } from "@repo/ui/pagination";
 import Link from "next/link";
 import { Plus, MessageCircle } from "lucide-react";
 import { prisma } from "@repo/database";
@@ -11,16 +12,19 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   CLOSED: { label: "Fechado", color: "bg-black/5 text-[var(--color-brand-charcoal)]/50" },
 };
 
-export default async function SuportePage() {
+export default async function SuportePage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  const tickets = await prisma.supportTicket.findMany({
+  const page = parsePage((await searchParams).page);
+  const rows = await prisma.supportTicket.findMany({
     where: { userId: session.user.id, deletedAt: null },
-    orderBy: { updatedAt: "desc" },
+    orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+    take: PAGE_SIZE + 1, skip: (page - 1) * PAGE_SIZE,
     include: { _count: { select: { messages: { where: { isInternal: false } } } } },
   });
 
+  const tickets = rows.slice(0, PAGE_SIZE);
   return (
     <div className="max-w-5xl mx-auto px-6 py-12">
       <header className="mb-12 flex items-end justify-between gap-4 flex-wrap">
@@ -90,6 +94,7 @@ export default async function SuportePage() {
           })}
         </div>
       )}
+      <Pagination page={page} hasMore={rows.length > PAGE_SIZE} href="/aluno/suporte" />
     </div>
   );
 }

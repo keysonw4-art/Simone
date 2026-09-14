@@ -82,14 +82,16 @@ export async function createModuleAction(
   });
   const order = (last?.order ?? 0) + 1;
 
-  const created = await prisma.module.create({
+  const created = await prisma.$transaction(async tx => {
+    const created = await tx.module.create({
     data: { courseId, title, description: description || null, order },
   });
-
-  await logAuditEvent({
+    await logAuditEvent({
     userId: admin.id,
     action: "module.create",
     details: { courseId, moduleId: created.id, title },
+  }, tx);
+    return created;
   });
 
   revalidatePath(`/cursos/${courseId}`);
@@ -113,15 +115,16 @@ export async function updateModuleAction(
 
   const { title, description } = parsed.data;
 
-  await prisma.module.update({
+  await prisma.$transaction(async tx => {
+    await tx.module.update({
     where: { id: moduleId },
     data: { title, description: description || null },
   });
-
-  await logAuditEvent({
+    await logAuditEvent({
     userId: admin.id,
     action: "module.update",
     details: { courseId, moduleId, title },
+  }, tx);
   });
 
   revalidatePath(`/cursos/${courseId}`);
@@ -139,15 +142,16 @@ export async function deleteModuleAction(
   const existing = await loadModuleInCourse(courseId, moduleId);
   if (!existing) return;
 
-  await prisma.module.update({
+  await prisma.$transaction(async tx => {
+    await tx.module.update({
     where: { id: moduleId },
     data: { deletedAt: new Date() },
   });
-
-  await logAuditEvent({
+    await logAuditEvent({
     userId: admin.id,
     action: "module.delete",
     details: { courseId, moduleId, title: existing.title },
+  }, tx);
   });
 
   revalidatePath(`/cursos/${courseId}`);
@@ -175,18 +179,18 @@ async function moveModule(
 
   if (!neighbor) return;
 
-  await prisma.$transaction([
-    prisma.module.update({
+  await prisma.$transaction(async tx => {
+    await Promise.all([
+    tx.module.update({
       where: { id: current.id },
       data: { order: neighbor.order },
     }),
-    prisma.module.update({
+    tx.module.update({
       where: { id: neighbor.id },
       data: { order: current.order },
     }),
-  ]);
-
-  await logAuditEvent({
+    ]);
+    await logAuditEvent({
     userId: admin.id,
     action: "module.reorder",
     details: {
@@ -195,6 +199,7 @@ async function moveModule(
       direction,
       swappedWith: neighbor.id,
     },
+  }, tx);
   });
 
   revalidatePath(`/cursos/${courseId}`);

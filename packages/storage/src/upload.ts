@@ -11,7 +11,7 @@ const ALLOWED_IMAGE_MIMES = [
   "image/avif",
 ] as const;
 
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
+const MAX_IMAGE_BYTES = 3 * 1024 * 1024; // Leaves headroom below Vercel request limits.
 
 type UploadImageInput = {
   bucket: BucketName;
@@ -45,8 +45,9 @@ export async function uploadImage(
 
   let webpBuffer: Buffer;
   try {
-    webpBuffer = await sharp(buffer)
+    webpBuffer = await sharp(buffer, { limitInputPixels: 16_000_000, sequentialRead: true, animated: false })
       .rotate() // honra EXIF orientation
+      .resize({ width: bucket === "fotos-perfil" ? 1024 : 2560, height: bucket === "fotos-perfil" ? 1024 : 2560, fit: "inside", withoutEnlargement: true })
       .webp({ quality: webpQuality })
       .toBuffer();
   } catch (error) {
@@ -72,7 +73,7 @@ export async function uploadImage(
   return { path, bucket };
 }
 
-const MAX_FILE_BYTES = 50 * 1024 * 1024; // 50 MB
+const MAX_FILE_BYTES = 3 * 1024 * 1024; // Server Action transport limit.
 
 type UploadFileInput = {
   bucket: BucketName;
@@ -98,9 +99,9 @@ export async function uploadFile(
   if (allowedMimes && !allowedMimes.includes(mimeType)) {
     throw new StorageValidationError(`Tipo não suportado: ${mimeType}`);
   }
-  if (file.size > maxBytes) {
+  if (file.size > Math.min(maxBytes, MAX_FILE_BYTES)) {
     throw new StorageValidationError(
-      `Arquivo maior que ${Math.round(maxBytes / 1024 / 1024)}MB`,
+      `Arquivo maior que ${Math.round(Math.min(maxBytes, MAX_FILE_BYTES) / 1024 / 1024)}MB`,
     );
   }
 

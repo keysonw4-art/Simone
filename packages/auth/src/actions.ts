@@ -1,12 +1,12 @@
 "use server";
 
 import { AuthError } from "next-auth";
-import { headers } from "next/headers";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@repo/database";
 import { sendWelcomeEmail } from "@repo/email";
 import { signIn } from "./index";
+import { consumeRateLimit, requestIp, safeRedirectTo, PasswordSchema } from './security';
 
 export type LoginFormState = { error: string } | undefined;
 
@@ -14,8 +14,7 @@ export async function loginAction(
   _prevState: LoginFormState,
   formData: FormData,
 ): Promise<LoginFormState> {
-  const redirectTo =
-    (formData.get("redirectTo") as string | null)?.trim() || "/";
+  const redirectTo = safeRedirectTo(formData.get('redirectTo'));
   try {
     await signIn("credentials", {
       email: formData.get("email"),
@@ -48,18 +47,7 @@ const SignupSchema = z.object({
     .toLowerCase()
     .email("E-mail inválido")
     .max(120, "E-mail deve ter no máximo 120 caracteres"),
-  password: z
-    .string()
-    .min(10, "Senha deve ter ao menos 10 caracteres")
-    .max(72, "Senha deve ter no máximo 72 caracteres")
-    .refine(
-      (v) => /[a-zA-Z]/.test(v),
-      "Senha deve conter ao menos 1 letra",
-    )
-    .refine(
-      (v) => /[0-9]/.test(v),
-      "Senha deve conter ao menos 1 número",
-    ),
+  password: PasswordSchema,
   acceptTerms: z
     .literal("on", {
       errorMap: () => ({ message: "Você precisa aceitar os termos para continuar" }),
@@ -95,32 +83,17 @@ export async function signupAction(
 
   // Rate limit por IP: barra criação em massa de contas e enumeração
   // automatizada de e-mails cadastrados.
-  const h = await headers();
-  const origin =
-    h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    h.get("x-real-ip") ||
-    "unknown";
-  const since = new Date(Date.now() - 15 * 60 * 1000);
-  const recentAttempts = await prisma.systemLog.count({
-    where: { event: "signup_attempt", origin, createdAt: { gt: since } },
-  });
-  if (recentAttempts >= 10) {
-    return {
-      errors: {
-        form: "Muitas tentativas de cadastro. Tente novamente em alguns minutos.",
-      },
-    };
+  const origin = await requestIp();
+  if (!await consumeRateLimit('signup-ip', origin, 5, 900) ||
+      !await consumeRateLimit('signup-email', email, 3, 86400)) {
+    return { errors: { form: "Muitas tentativas. Aguarde antes de tentar novamente." } };
   }
-  await prisma.systemLog
-    .create({ data: { event: "signup_attempt", origin, description: JSON.stringify({ email }) } })
-    .catch(() => {});
-
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
     return { errors: { email: "E-mail já cadastrado" } };
   }
 
-  const passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await bcrypt.hash(password, 12);
   const year = new Date().getFullYear();
 
   try {
@@ -152,8 +125,7 @@ export async function signupAction(
   // E-mail de boas-vindas (fail-safe: nunca derruba o cadastro).
   await sendWelcomeEmail({ to: email, name });
 
-  const redirectTo =
-    (formData.get("redirectTo") as string | null)?.trim() || "/";
+  const redirectTo = safeRedirectTo(formData.get('redirectTo'));
 
   try {
     await signIn("credentials", { email, password, redirectTo });

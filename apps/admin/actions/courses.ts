@@ -153,226 +153,90 @@ function isUniqueViolation(error: unknown): boolean {
   );
 }
 
-export async function createCourseAction(
-  _prev: CourseFormState,
-  formData: FormData,
-): Promise<CourseFormState> {
-  let admin;
-  try {
-    admin = await requireAdmin();
-  } catch {
-    return { errors: { form: "Acesso negado." } };
-  }
 
+async function saveCourse(id: string | null, formData: FormData): Promise<CourseFormState | { id: string }> {
+  const admin = await requireAdminOrThrow();
   const parsed = CourseSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) {
-    return { errors: flattenZod(parsed.error), values: valuesFrom(formData) };
-  }
-
+  if (!parsed.success) return { errors: flattenZod(parsed.error), values: valuesFrom(formData) };
   const { title, slug, description, thumbnail, ...commercial } = parsed.data;
-
-  let created;
+  const data = { title, slug, description: description || null, thumbnail: thumbnail || null, ...commercialData(commercial) };
   try {
-    created = await prisma.course.create({
-      data: {
-        title,
-        slug,
-        description: description || null,
-        thumbnail: thumbnail || null,
-        ...commercialData(commercial),
-        // Seção padrão (título vazio) — as aulas entram direto nela; o admin
-        // pode adicionar seções nomeadas depois se quiser agrupar.
-        modules: { create: { title: "", order: 0 } },
-      },
+    const saved = await prisma.$transaction(async tx => {
+      const course = id
+        ? await tx.course.update({ where: { id, deletedAt: null }, data })
+        : await tx.course.create({ data: { ...data, modules: { create: { title: "", order: 0 } } } });
+      await logAuditEvent({ userId: admin.id, action: id ? "course.update" : "course.create",
+        details: { courseId: course.id, slug, title } }, tx);
+      return course;
     });
+    revalidatePath("/cursos");
+    revalidatePath(`/cursos/${saved.id}`);
+    return { id: saved.id };
   } catch (error) {
-    if (isUniqueViolation(error)) {
-      return {
-        errors: { slug: "Já existe um curso com esse slug" },
-        values: valuesFrom(formData),
-      };
-    }
-    console.error("[courses] create failed:", error);
-    return {
-      errors: { form: "Não foi possível criar o curso. Tente novamente." },
-      values: valuesFrom(formData),
-    };
+    console.error("[courses] save failed:", error);
+    return { errors: isUniqueViolation(error) ? { slug: "Já existe um curso com esse slug" }
+      : { form: "Não foi possível salvar o módulo." }, values: valuesFrom(formData) };
   }
-
-  await logAuditEvent({
-    userId: admin.id,
-    action: "course.create",
-    details: { courseId: created.id, slug: created.slug, title: created.title },
-  });
-
-  revalidatePath("/cursos");
-  redirect(`/cursos/${created.id}`);
 }
 
-export async function updateCourseAction(
-  id: string,
-  _prev: CourseFormState,
-  formData: FormData,
-): Promise<CourseFormState> {
-  let admin;
-  try {
-    admin = await requireAdmin();
-  } catch {
-    return { errors: { form: "Acesso negado." } };
-  }
+export async function createCourseAction(_prev: CourseFormState, formData: FormData): Promise<CourseFormState> {
+  const result = await saveCourse(null, formData);
+  if (result && "id" in result) redirect(`/cursos/${result.id}`);
+  return result;
+}
 
-  const parsed = CourseSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) {
-    return { errors: flattenZod(parsed.error), values: valuesFrom(formData) };
-  }
-
-  const { title, slug, description, thumbnail, ...commercial } = parsed.data;
-
-  try {
-    await prisma.course.update({
-      where: { id },
-      data: {
-        title,
-        slug,
-        description: description || null,
-        thumbnail: thumbnail || null,
-        ...commercialData(commercial),
-      },
-    });
-  } catch (error) {
-    if (isUniqueViolation(error)) {
-      return {
-        errors: { slug: "Já existe um curso com esse slug" },
-        values: valuesFrom(formData),
-      };
-    }
-    console.error("[courses] update failed:", error);
-    return {
-      errors: { form: "Não foi possível salvar as alterações." },
-      values: valuesFrom(formData),
-    };
-  }
-
-  await logAuditEvent({
-    userId: admin.id,
-    action: "course.update",
-    details: { courseId: id, slug, title },
-  });
-
-  revalidatePath("/cursos");
-  revalidatePath(`/cursos/${id}`);
-
-  return { errors: {}, values: valuesFrom(formData) };
+export async function updateCourseAction(id: string, _prev: CourseFormState, formData: FormData): Promise<CourseFormState> {
+  if (!z.string().uuid().safeParse(id).success) return { errors: { form: "Módulo inválido." } };
+  const result = await saveCourse(id, formData);
+  return result && "id" in result ? { errors: {}, values: valuesFrom(formData) } : result;
 }
 
 export async function archiveCourseAction(id: string): Promise<void> {
   const admin = await requireAdminOrThrow();
-
-  const current = await prisma.course.findUnique({
-    where: { id },
-    select: { isArchived: true, slug: true },
+  await prisma.$transaction(async tx => {
+    const course = await tx.course.findFirst({ where: { id, deletedAt: null } });
+    if (!course) return;
+    await tx.course.update({ where: { id, isArchived: course.isArchived }, data: { isArchived: !course.isArchived } });
+    await logAuditEvent({ userId: admin.id, action: course.isArchived ? "course.unarchive" : "course.archive", details: { courseId: id } }, tx);
   });
-  if (!current) return;
-
-  const nextValue = !current.isArchived;
-
-  await prisma.course.update({
-    where: { id },
-    data: { isArchived: nextValue },
-  });
-
-  await logAuditEvent({
-    userId: admin.id,
-    action: nextValue ? "course.archive" : "course.unarchive",
-    details: { courseId: id, slug: current.slug },
-  });
-
   revalidatePath("/cursos");
   revalidatePath(`/cursos/${id}`);
 }
 
 export async function deleteCourseAction(id: string): Promise<void> {
   const admin = await requireAdminOrThrow();
-
-  const current = await prisma.course.findUnique({
-    where: { id },
-    select: { slug: true, title: true },
+  await prisma.$transaction(async tx => {
+    await tx.course.update({ where: { id }, data: { deletedAt: new Date() } });
+    await logAuditEvent({ userId: admin.id, action: "course.delete", details: { courseId: id } }, tx);
   });
-  if (!current) return;
-
-  await prisma.course.update({
-    where: { id },
-    data: { deletedAt: new Date() },
-  });
-
-  await logAuditEvent({
-    userId: admin.id,
-    action: "course.delete",
-    details: { courseId: id, slug: current.slug, title: current.title },
-  });
-
   revalidatePath("/cursos");
   redirect("/cursos");
 }
 
 export async function duplicateCourseAction(id: string): Promise<void> {
   const admin = await requireAdminOrThrow();
-
-  const source = await prisma.course.findUnique({
-    where: { id },
-    select: { title: true, slug: true, description: true, thumbnail: true },
-  });
+  const source = await prisma.course.findFirst({ where: { id, deletedAt: null },
+    select: { title: true, slug: true, description: true, thumbnail: true } });
   if (!source) return;
-
-  const baseTitle = `${source.title} (cópia)`;
-  const baseSlug = `${slugify(source.slug)}-copia-${randomSlugSuffix()}`;
-
-  let duplicate;
-  try {
-    duplicate = await prisma.course.create({
-      data: {
-        title: baseTitle,
-        slug: baseSlug,
-        description: source.description,
-        thumbnail: source.thumbnail,
-      },
-    });
-  } catch (error) {
-    if (isUniqueViolation(error)) {
-      duplicate = await prisma.course.create({
-        data: {
-          title: baseTitle,
-          slug: `${baseSlug}-${randomSlugSuffix()}`,
-          description: source.description,
-          thumbnail: source.thumbnail,
-        },
-      });
-    } else {
-      throw error;
-    }
-  }
-
-  await logAuditEvent({
-    userId: admin.id,
-    action: "course.duplicate",
-    details: {
-      sourceCourseId: id,
-      newCourseId: duplicate.id,
-      newSlug: duplicate.slug,
-    },
+  const duplicate = await prisma.$transaction(async tx => {
+    const created = await tx.course.create({ data: {
+      title: `${source.title} (cópia)`.slice(0, 120),
+      slug: `${slugify(source.slug).slice(0, 90)}-copia-${randomSlugSuffix()}`,
+      description: source.description, thumbnail: source.thumbnail,
+      modules: { create: { title: "", order: 0 } },
+    } });
+    await logAuditEvent({ userId: admin.id, action: "course.duplicate",
+      details: { sourceCourseId: id, newCourseId: created.id, newSlug: created.slug } }, tx);
+    return created;
   });
-
   revalidatePath("/cursos");
   redirect(`/cursos/${duplicate.id}`);
 }
 
 async function requireAdminOrThrow() {
-  try {
-    return await requireAdmin();
-  } catch (error) {
-    if (error instanceof UnauthorizedError) {
-      redirect("/login");
-    }
+  try { return await requireAdmin(); }
+  catch (error) {
+    if (error instanceof UnauthorizedError) redirect("/login");
     throw error;
   }
 }

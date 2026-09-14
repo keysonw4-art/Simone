@@ -8,7 +8,9 @@
     ".": "./src/index.ts",
     "./config": "./src/config.ts",
     "./actions": "./src/actions.ts",
-    "./password-reset": "./src/passwordReset.ts"
+    "./password-reset": "./src/passwordReset.ts",
+    "./security": "./src/security.ts",
+    "./csp": "./src/csp.ts"
   },
   "scripts": {
     "lint": "eslint .",
@@ -18,11 +20,11 @@
     "@repo/database": "*",
     "@repo/email": "*",
     "bcryptjs": "^3.0.3",
-    "next-auth": "^5.0.0-beta.31",
+    "next-auth": "5.0.0-beta.32",
     "zod": "^3.23.8"
   },
   "peerDependencies": {
-    "next": "^16",
+    "next": "^16.3.5",
     "react": "^19"
   },
   "devDependencies": {

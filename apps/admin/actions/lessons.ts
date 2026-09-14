@@ -106,7 +106,8 @@ export async function createLessonAction(
   });
   const order = (last?.order ?? 0) + 1;
 
-  const created = await prisma.lesson.create({
+  await prisma.$transaction(async tx => {
+    const created = await tx.lesson.create({
     data: {
       moduleId,
       title,
@@ -116,11 +117,12 @@ export async function createLessonAction(
       order,
     },
   });
-
-  await logAuditEvent({
+    await logAuditEvent({
     userId: admin.id,
     action: "lesson.create",
     details: { courseId, moduleId, lessonId: created.id, title },
+  }, tx);
+    return created;
   });
 
   revalidatePath(`/cursos/${courseId}/modulos/${moduleId}`);
@@ -145,7 +147,8 @@ export async function updateLessonAction(
 
   const { title, description, vimeoVideoId, isProtected } = parsed.data;
 
-  await prisma.lesson.update({
+  await prisma.$transaction(async tx => {
+    await tx.lesson.update({
     where: { id: lessonId },
     data: {
       title,
@@ -154,11 +157,11 @@ export async function updateLessonAction(
       isProtected,
     },
   });
-
-  await logAuditEvent({
+    await logAuditEvent({
     userId: admin.id,
     action: "lesson.update",
     details: { courseId, moduleId, lessonId, title },
+  }, tx);
   });
 
   revalidatePath(`/cursos/${courseId}/modulos/${moduleId}`);
@@ -180,15 +183,16 @@ export async function deleteLessonAction(
   const existing = await loadLessonInModule(courseId, moduleId, lessonId);
   if (!existing) return;
 
-  await prisma.lesson.update({
+  await prisma.$transaction(async tx => {
+    await tx.lesson.update({
     where: { id: lessonId },
     data: { deletedAt: new Date() },
   });
-
-  await logAuditEvent({
+    await logAuditEvent({
     userId: admin.id,
     action: "lesson.delete",
     details: { courseId, moduleId, lessonId, title: existing.title },
+  }, tx);
   });
 
   revalidatePath(`/cursos/${courseId}/modulos/${moduleId}`);
@@ -217,21 +221,22 @@ async function moveLesson(
 
   if (!neighbor) return;
 
-  await prisma.$transaction([
-    prisma.lesson.update({
+  await prisma.$transaction(async tx => {
+    await Promise.all([
+    tx.lesson.update({
       where: { id: current.id },
       data: { order: neighbor.order },
     }),
-    prisma.lesson.update({
+    tx.lesson.update({
       where: { id: neighbor.id },
       data: { order: current.order },
     }),
-  ]);
-
-  await logAuditEvent({
+    ]);
+    await logAuditEvent({
     userId: admin.id,
     action: "lesson.reorder",
     details: { courseId, moduleId, lessonId, direction, swappedWith: neighbor.id },
+  }, tx);
   });
 
   revalidatePath(`/cursos/${courseId}/modulos/${moduleId}`);
@@ -265,15 +270,16 @@ export async function toggleLessonProtectedAction(
 
   const next = !existing.isProtected;
 
-  await prisma.lesson.update({
+  await prisma.$transaction(async tx => {
+    await tx.lesson.update({
     where: { id: lessonId },
     data: { isProtected: next },
   });
-
-  await logAuditEvent({
+    await logAuditEvent({
     userId: admin.id,
     action: "lesson.toggle_protected",
     details: { courseId, moduleId, lessonId, isProtected: next },
+  }, tx);
   });
 
   revalidatePath(`/cursos/${courseId}/modulos/${moduleId}`);

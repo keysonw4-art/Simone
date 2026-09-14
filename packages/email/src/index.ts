@@ -38,6 +38,7 @@ export async function sendPurchaseConfirmationEmail(params: {
   itemName: string;
   amountCents: number;
   expiresAt: Date;
+  idempotencyKey?: string;
 }): Promise<SendResult> {
   const link = `${appUrl()}/aluno/cursos`;
   const { subject, html } = purchaseConfirmationTemplate({
@@ -47,7 +48,7 @@ export async function sendPurchaseConfirmationEmail(params: {
     expiresAt: params.expiresAt,
     link,
   });
-  return sendEmail({ to: params.to, subject, html });
+  return sendEmail({ to: params.to, subject, html, idempotencyKey: params.idempotencyKey });
 }
 
 /** E-mail de aviso de expiração de acesso (disparado pelo cron). */
@@ -57,6 +58,7 @@ export async function sendExpiryWarningEmail(params: {
   itemName: string;
   expiresAt: Date;
   daysLeft: number;
+  idempotencyKey?: string;
 }): Promise<SendResult> {
   const link = `${appUrl()}/aluno/cursos`;
   const { subject, html } = expiryWarningTemplate({
@@ -66,5 +68,5 @@ export async function sendExpiryWarningEmail(params: {
     daysLeft: params.daysLeft,
     link,
   });
-  return sendEmail({ to: params.to, subject, html });
+  return sendEmail({ to: params.to, subject, html, idempotencyKey: params.idempotencyKey });
 }

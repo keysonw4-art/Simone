@@ -1,3 +1,4 @@
+import { requireAdminPage } from "@/lib/requireAdmin";
 import Link from "next/link";
 import { prisma } from "@repo/database";
 import { Plus } from "lucide-react";
@@ -26,6 +27,7 @@ export default async function CursosPage({
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
+  await requireAdminPage();
   const { status: rawStatus } = await searchParams;
   const status = normalizeStatus(rawStatus);
 

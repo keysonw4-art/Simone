@@ -243,7 +243,7 @@ export function CourseForm({
             placeholder="197,00"
           />
           <span className="text-[10px] text-[var(--color-brand-charcoal)]/50">
-            Em reais. Ex.: 197 ou 197,00. Só usado se "vender avulso" estiver marcado.
+            Em reais. Ex.: 197 ou 197,00. Só usado se &quot;vender avulso&quot; estiver marcado.
           </span>
           {errors?.standalonePriceCents && (
             <span className="text-red-500 text-[10px] font-medium">

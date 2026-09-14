@@ -20,11 +20,10 @@ export function UserBlockControl({
 
   const handleClick = () => {
     if (disabled) return;
-    const label = isBlocked ? "reativar" : "bloquear";
     if (
       !isBlocked &&
       !confirm(
-        "Bloquear cancela as assinaturas ativas do usuário e o impede de logar. Continuar?",
+        "Bloquear encerra as sessões e suspende o acesso do usuário. Compras e histórico são preservados. Continuar?",
       )
     ) {
       return;

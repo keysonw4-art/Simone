@@ -1,9 +1,11 @@
+import { requireAdminPage } from "@/lib/requireAdmin";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { createProductAction } from "../../../../actions/products";
 import { ProductForm } from "../../../../components/ProductForm";
 
-export default function NovoProdutoPage() {
+export default async function NovoProdutoPage() {
+  await requireAdminPage();
   return (
     <div>
       <Link

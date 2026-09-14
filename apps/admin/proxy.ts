@@ -2,17 +2,28 @@ import NextAuth from "next-auth";
 import { authConfig } from "@repo/auth/config";
 import { NextResponse, type NextMiddleware } from "next/server";
 
+import { createCspHeaders } from "@repo/auth/csp";
+
 const { auth } = NextAuth(authConfig);
 
 const handler: NextMiddleware = auth((req) => {
+  const csp = createCspHeaders(req.headers, "admin");
+  const next = () => {
+    const response = NextResponse.next({ request: { headers: csp.headers } });
+    response.headers.set("Content-Security-Policy", csp.policy);
+    return response;
+  };
   const isLoggedIn = !!req.auth;
   const role = req.auth?.user?.role;
   const pathname = req.nextUrl.pathname;
   const isAuthRoute =
-    pathname.startsWith("/api/auth") || pathname.startsWith("/login");
+    (pathname === "/api/auth" || pathname.startsWith("/api/auth/")) || pathname === "/login";
 
-  if (isAuthRoute) return NextResponse.next();
+  if (isAuthRoute) return next();
 
+  if (pathname.startsWith("/api/") && (!isLoggedIn || (role !== "ADMIN" && role !== "SUPER_ADMIN"))) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
   if (!isLoggedIn) {
     return NextResponse.redirect(new URL("/login", req.nextUrl));
   }
@@ -23,11 +34,11 @@ const handler: NextMiddleware = auth((req) => {
     );
   }
 
-  return NextResponse.next();
+  return next();
 }) as unknown as NextMiddleware;
 
 export default handler;
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

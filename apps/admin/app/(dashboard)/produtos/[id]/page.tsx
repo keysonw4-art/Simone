@@ -1,3 +1,4 @@
+import { requireAdminPage } from "@/lib/requireAdmin";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
@@ -16,6 +17,7 @@ export default async function EditarProdutoPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireAdminPage();
   const { id } = await params;
 
   const product = await prisma.product.findFirst({

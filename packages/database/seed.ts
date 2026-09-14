@@ -13,17 +13,16 @@ async function main() {
   const providedPassword = process.env.SEED_ADMIN_PASSWORD;
   const rawPassword = providedPassword ?? randomBytes(12).toString("base64url");
   const passwordHash = await bcrypt.hash(rawPassword, 12);
+  const existingAdmin = await prisma.user.findUnique({ where: { email: adminEmail } });
+  if (existingAdmin && existingAdmin.role !== 'SUPER_ADMIN') {
+    throw new Error('Seed abortado: e-mail administrativo já pertence a uma conta não validada.');
+  }
 
   // Em re-seed, NÃO sobrescreve a senha existente (evita reintroduzir uma
   // senha fraca por cima de uma já rotacionada). A senha só é definida na
   // criação inicial.
-  const user = await prisma.user.upsert({
-    where: { email: adminEmail },
-    update: {
-      role: "SUPER_ADMIN",
-      acceptedTermsAt: new Date(),
-    },
-    create: {
+  const user = existingAdmin ?? await prisma.user.create({
+    data: {
       publicId: `SIM-${year}-0000`,
       email: adminEmail,
       passwordHash,
@@ -128,7 +127,7 @@ async function main() {
   });
 
   console.log("Super Admin pronto: " + user.email);
-  if (!providedPassword) {
+  if (!providedPassword && !existingAdmin) {
     console.log(
       "\n  ⚠️  Senha do super admin gerada automaticamente (só criação nova):\n" +
         `      ${rawPassword}\n` +

@@ -79,17 +79,13 @@ export async function adminReplyTicketAction(
           data: { status: "IN_PROGRESS" },
         });
       }
+      await logAuditEvent({ userId: admin.id, action: "ticket.reply", details: { ticketId, targetUserId: ticket.userId, isInternal } }, tx);
     });
   } catch (error) {
     console.error("[tickets] reply failed:", error);
     return { errors: { form: "Não foi possível enviar a resposta." } };
   }
 
-  await logAuditEvent({
-    userId: admin.id,
-    action: "ticket.reply",
-    details: { ticketId, targetUserId: ticket.userId, isInternal },
-  });
 
   revalidatePath(`/suporte/${ticketId}`);
   revalidatePath("/suporte");
@@ -111,15 +107,15 @@ export async function updateTicketStatusAction(
   if (!ticket) return;
   if (ticket.status === status) return;
 
-  await prisma.supportTicket.update({
+  await prisma.$transaction(async tx => {
+    await tx.supportTicket.update({
     where: { id: ticketId },
     data: {
       status,
       closedAt: status === "CLOSED" ? new Date() : null,
     },
   });
-
-  await logAuditEvent({
+    await logAuditEvent({
     userId: admin.id,
     action: "ticket.status_change",
     details: {
@@ -128,6 +124,7 @@ export async function updateTicketStatusAction(
       from: ticket.status,
       to: status,
     },
+  }, tx);
   });
 
   revalidatePath(`/suporte/${ticketId}`);

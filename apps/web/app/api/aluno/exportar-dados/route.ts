@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@repo/database";
 import { auth } from "@repo/auth";
+import { consumeRateLimit } from '@repo/auth/security';
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,7 @@ export async function GET() {
   if (!session?.user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+  if (!await consumeRateLimit('data-export', session.user.id, 2, 3600)) return NextResponse.json({ error: 'rate_limited' }, { status: 429, headers: { 'Retry-After': '3600' } });
 
   const user = await prisma.user.findFirst({
     where: { id: session.user.id, deletedAt: null },

@@ -6,8 +6,11 @@
 
 /** URL canônica da app do aluno, base dos links nos e-mails. */
 export function appUrl(): string {
-  const raw = process.env.APP_URL ?? "https://simone-site-web.vercel.app";
-  return raw.replace(/\/+$/, "");
+  const raw = process.env.APP_URL ?? (process.env.NODE_ENV === "development" ? "http://localhost:3001" : "https://simone-site-web.vercel.app");
+  const url = new URL(raw);
+  const local = process.env.NODE_ENV !== "production" && ["localhost", "127.0.0.1"].includes(url.hostname);
+  if ((!local && url.protocol !== "https:") || url.username || url.password) throw new Error("APP_URL inválida");
+  return url.origin;
 }
 
 /**

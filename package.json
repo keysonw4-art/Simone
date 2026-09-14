@@ -5,16 +5,22 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
+    "test:security": "node --test tests/security.test.cjs",
     "check-types": "turbo run check-types",
     "format": "prettier --write \"**/*.{ts,tsx,md}\""
   },
   "devDependencies": {
+    "next": "16.3.5",
     "prettier": "^3.6.0",
     "prettier-plugin-tailwindcss": "^0.7.1",
     "turbo": "^2.10.0"
   },
+  "overrides": {
+    "next": "16.3.5",
+    "next-auth": "5.0.0-beta.32"
+  },
   "engines": {
-    "node": ">=18"
+    "node": ">=20.9.0"
   },
   "packageManager": "npm@11.13.0",
   "workspaces": [

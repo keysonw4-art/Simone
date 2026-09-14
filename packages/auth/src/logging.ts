@@ -11,7 +11,7 @@ export type LoginFailureReason =
 
 export function extractIp(request: Request | undefined): string {
   if (!request) return "unknown";
-  const forwarded = request.headers.get("x-forwarded-for");
+  const forwarded = request.headers.get('x-vercel-forwarded-for') ?? request.headers.get("x-forwarded-for");
   if (forwarded) {
     const first = forwarded.split(",")[0]?.trim();
     if (first) return first;

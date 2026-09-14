@@ -29,7 +29,7 @@ export function TicketStatusControl({ ticketId, currentStatus }: Props) {
     startTransition(async () => {
       try {
         await updateTicketStatusAction(ticketId, next);
-      } catch (e) {
+      } catch {
         setStatus(previous);
         setError("Não foi possível alterar o status.");
       }

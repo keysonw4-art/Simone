@@ -58,6 +58,9 @@ export function AccountDangerZone() {
         <label className="text-xs uppercase tracking-widest text-[var(--color-brand-charcoal)]/70 font-medium">
           Digite <strong className="font-mono">{CONFIRMATION_WORD}</strong> para confirmar
         </label>
+        <label className="text-xs">Confirme sua senha atual
+          <input type="password" name="password" autoComplete="current-password" required className="block border border-black/10 rounded-sm px-3 py-2 mt-2 mb-4" />
+        </label>
         <input
           type="text"
           name="confirmation"

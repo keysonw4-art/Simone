@@ -1,11 +1,16 @@
+import { requireAdminPage } from "@/lib/requireAdmin";
+import { Pagination, parsePage, PAGE_SIZE } from "@repo/ui/pagination";
 import Link from "next/link";
 import { prisma } from "@repo/database";
 import { UserCircle } from "lucide-react";
 
-export default async function AlunosPage() {
-  const students = await prisma.user.findMany({
+export default async function AlunosPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
+  await requireAdminPage();
+  const page = parsePage((await searchParams).page);
+  const rows = await prisma.user.findMany({
     where: { deletedAt: null, role: "STUDENT" },
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: PAGE_SIZE + 1, skip: (page - 1) * PAGE_SIZE,
     select: {
       id: true,
       publicId: true,
@@ -13,11 +18,12 @@ export default async function AlunosPage() {
       email: true,
       createdAt: true,
       _count: {
-        select: { entitlements: { where: { expiresAt: { gt: new Date() } } } },
+        select: { entitlements: { where: { expiresAt: { gt: new Date() }, purchase: { status: "PAID", accessSuspended: false } } } },
       },
     },
   });
 
+  const students = rows.slice(0, PAGE_SIZE);
   return (
     <div>
       <header className="mb-12">
@@ -25,7 +31,7 @@ export default async function AlunosPage() {
           Alunos
         </h1>
         <p className="text-[var(--color-brand-charcoal)]/60 mt-2 text-sm uppercase tracking-widest">
-          Gestão de usuários ({students.length})
+          Gestão de usuários · até {PAGE_SIZE} por página
         </p>
       </header>
 
@@ -99,6 +105,7 @@ export default async function AlunosPage() {
           </table>
         )}
       </div>
+      <Pagination page={page} hasMore={rows.length > PAGE_SIZE} href="/alunos" />
     </div>
   );
 }

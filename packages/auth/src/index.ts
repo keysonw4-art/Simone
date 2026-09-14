@@ -5,9 +5,24 @@ import bcrypt from "bcryptjs";
 import { authConfig } from "./config";
 import { extractIp, logLoginFailure } from "./logging";
 import { checkLoginRateLimit } from "./rateLimit";
+import { EmailSchema } from './security';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
+  callbacks: {
+    ...authConfig.callbacks,
+    async jwt(params) {
+      const token = await authConfig.callbacks.jwt(params);
+      if (!token || typeof token.id !== 'string' || typeof token.sessionVersion !== 'number') return null;
+      const user = await prisma.user.findUnique({
+        where: { id: token.id },
+        select: { role: true, sessionVersion: true, blockedAt: true, deletedAt: true },
+      });
+      if (!user || user.blockedAt || user.deletedAt || user.sessionVersion !== token.sessionVersion) return null;
+      token.role = user.role;
+      return token;
+    },
+  },
   providers: [
     Credentials({
       credentials: {
@@ -16,26 +31,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       async authorize(credentials, request) {
         const origin = extractIp(request);
-        const email =
-          typeof credentials?.email === "string" ? credentials.email : null;
+        const parsedEmail = EmailSchema.safeParse(credentials?.email);
+        const email = parsedEmail.success ? parsedEmail.data : null;
 
-        if (!email || !credentials?.password) {
-          await logLoginFailure({
-            email,
-            reason: "missing_credentials",
-            origin,
-          });
+        if (!email || typeof credentials?.password !== 'string' || !credentials.password || Buffer.byteLength(credentials.password, 'utf8') > 72) {
           return null;
         }
 
         // Rate limit ANTES da consulta ao user + bcrypt (economiza CPU e DB)
         const rl = await checkLoginRateLimit({ email, origin });
         if (rl.blocked) {
-          await logLoginFailure({
-            email,
-            reason: "rate_limited",
-            origin,
-          });
           return null;
         }
 
@@ -77,7 +82,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
 
         const passwordsMatch = await bcrypt.compare(
-          credentials.password as string,
+          credentials.password,
           user.passwordHash,
         );
 
@@ -96,6 +101,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: user.email,
           name: user.name,
           role: user.role,
+          sessionVersion: user.sessionVersion,
         };
       },
     }),

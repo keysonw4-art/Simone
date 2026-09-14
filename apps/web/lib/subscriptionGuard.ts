@@ -69,7 +69,7 @@ export async function requireLessonAccess(lessonId: string): Promise<{
   const user = await requireSession();
 
   const found = await prisma.lesson.findFirst({
-    where: { id: lessonId, deletedAt: null },
+    where: { id: lessonId, deletedAt: null, module: { deletedAt: null, course: { deletedAt: null, isArchived: false } } },
     select: {
       id: true,
       isProtected: true,

@@ -1,3 +1,5 @@
+import { requireAdminPage } from "@/lib/requireAdmin";
+import { Pagination, parsePage, PAGE_SIZE } from "@repo/ui/pagination";
 import Link from "next/link";
 import { prisma } from "@repo/database";
 import type { TicketStatus } from "@repo/database";
@@ -29,24 +31,28 @@ const FILTERS: { key: StatusFilter; label: string; href: string }[] = [
 export default async function AdminSuportePage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; page?: string }>;
 }) {
-  const { status: rawStatus } = await searchParams;
+  await requireAdminPage();
+  const { status: rawStatus, page: rawPage } = await searchParams;
+  const page = parsePage(rawPage);
   const filter = normalizeFilter(rawStatus);
 
   const where = filter === "all"
     ? { deletedAt: null }
     : { deletedAt: null, status: filter };
 
-  const tickets = await prisma.supportTicket.findMany({
+  const rows = await prisma.supportTicket.findMany({
     where,
-    orderBy: [{ status: "asc" }, { updatedAt: "desc" }],
+    orderBy: [{ status: "asc" }, { updatedAt: "desc" }, { id: "desc" }],
+    take: PAGE_SIZE + 1, skip: (page - 1) * PAGE_SIZE,
     include: {
       user: { select: { name: true, email: true, publicId: true } },
       _count: { select: { messages: true } },
     },
   });
 
+  const tickets = rows.slice(0, PAGE_SIZE);
   return (
     <div>
       <header className="mb-10">
@@ -152,6 +158,7 @@ export default async function AdminSuportePage({
           </table>
         )}
       </div>
+      <Pagination page={page} hasMore={rows.length > PAGE_SIZE} href={`/suporte?status=${filter}`} />
     </div>
   );
 }

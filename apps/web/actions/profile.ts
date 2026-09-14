@@ -1,10 +1,12 @@
 "use server";
 
+import bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@repo/database";
 import { auth, signOut } from "@repo/auth";
+import { consumeRateLimit } from '@repo/auth/security';
 import {
   BUCKETS,
   StorageUploadError,
@@ -27,17 +29,22 @@ export async function deleteAccountAction(
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  const confirmation = (formData.get("confirmation") as string | null)?.trim();
+  const rawConfirmation = formData.get("confirmation");
+  const confirmation = typeof rawConfirmation === "string" ? rawConfirmation.trim() : "";
   if (confirmation !== CONFIRMATION_WORD) {
     return { error: `Digite "${CONFIRMATION_WORD}" para confirmar.` };
   }
 
   const userId = session.user.id;
+  if (!await consumeRateLimit("delete-account", userId, 5, 900)) return { error: "Aguarde antes de tentar novamente." };
+  const password = formData.get("password");
+  const current = await prisma.user.findUnique({ where: { id: userId }, select: { passwordHash: true, sessionVersion: true } });
+  if (typeof password !== "string" || Buffer.byteLength(password) > 72 || !current?.passwordHash || !await bcrypt.compare(password, current.passwordHash)) return { error: "Senha atual incorreta." };
 
   try {
     await prisma.$transaction(async (tx) => {
       const user = await tx.user.findFirst({
-        where: { id: userId, deletedAt: null },
+        where: { id: userId, deletedAt: null, sessionVersion: current.sessionVersion },
         select: { id: true, role: true, publicId: true },
       });
       if (!user) return;
@@ -56,6 +63,7 @@ export async function deleteAccountAction(
           name: "[Conta excluída]",
           passwordHash: null,
           deletedAt: new Date(),
+          sessionVersion: { increment: 1 },
         },
       });
 
@@ -106,6 +114,7 @@ export async function uploadAvatarAction(
 ): Promise<AvatarUploadState> {
   const session = await auth();
   if (!session?.user) redirect("/login");
+  if (!await consumeRateLimit('avatar', session.user.id, 5, 600)) return { ok: false, error: 'Aguarde antes de alterar a foto novamente.' };
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
@@ -150,6 +159,7 @@ export type AvatarRemoveResult = { ok: true } | { ok: false; error: string };
 export async function removeAvatarAction(): Promise<AvatarRemoveResult> {
   const session = await auth();
   if (!session?.user) redirect("/login");
+  if (!await consumeRateLimit('avatar', session.user.id, 5, 600)) return { ok: false, error: 'Aguarde antes de alterar a foto novamente.' };
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },

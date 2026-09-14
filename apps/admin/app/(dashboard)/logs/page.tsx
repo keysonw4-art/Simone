@@ -1,3 +1,4 @@
+import { requireAdminPage } from "@/lib/requireAdmin";
 import Link from "next/link";
 import { prisma } from "@repo/database";
 
@@ -52,6 +53,7 @@ export default async function LogsPage({
 }: {
   searchParams: Promise<{ tab?: string }>;
 }) {
+  await requireAdminPage();
   const { tab: rawTab } = await searchParams;
   const tab = normalizeTab(rawTab);
 

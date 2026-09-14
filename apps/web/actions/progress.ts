@@ -5,6 +5,7 @@ import { auth } from "@repo/auth";
 import { revalidatePath } from "next/cache";
 import { issueCertificateIfEligible } from "../lib/certificates";
 import { hasCourseEntitlement } from "../lib/entitlements";
+import { IdSchema, consumeRateLimit } from '@repo/auth/security';
 
 export async function toggleLessonProgress(lessonId: string, isCompleted: boolean) {
   const session = await auth();
@@ -14,12 +15,14 @@ export async function toggleLessonProgress(lessonId: string, isCompleted: boolea
   }
 
   const userId = session.user.id;
+  if (!IdSchema.safeParse(lessonId).success || typeof isCompleted !== 'boolean') return { success: false, error: 'Dados inválidos' };
+  if (!await consumeRateLimit('progress', userId, 60, 60)) return { success: false, error: 'Aguarde antes de atualizar novamente.' };
   const role = session.user.role;
   const isStaff = role === "ADMIN" || role === "SUPER_ADMIN";
 
   // Carrega a aula pra saber o curso e se é protegida ANTES de gravar nada.
   const lesson = await prisma.lesson.findFirst({
-    where: { id: lessonId, deletedAt: null },
+    where: { id: lessonId, deletedAt: null, module: { deletedAt: null, course: { deletedAt: null, isArchived: false } } },
     select: { id: true, isProtected: true, module: { select: { courseId: true } } },
   });
   if (!lesson) {

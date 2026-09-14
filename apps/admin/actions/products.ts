@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Prisma, prisma } from "@repo/database";
 import { requireAdmin, UnauthorizedError } from "../lib/requireAdmin";
-import { logAuditEvent } from "../lib/audit";
+import { logAuditEvent, mutateAndAudit } from "../lib/audit";
 import { reaisToCents } from "../lib/money";
 
 const ProductSchema = z.object({
@@ -137,7 +137,8 @@ export async function createProductAction(
 
   let created;
   try {
-    created = await prisma.product.create({ data: dataFrom(parsed.data) });
+    created = await mutateAndAudit({ userId: admin.id, action: "product.create", details: { slug: parsed.data.slug } },
+      tx => tx.product.create({ data: dataFrom(parsed.data) }));
   } catch (error) {
     if (isUniqueViolation(error)) {
       return { errors: { slug: "Já existe um curso com esse slug" } };
@@ -146,11 +147,6 @@ export async function createProductAction(
     return { errors: { form: "Não foi possível criar o curso." } };
   }
 
-  await logAuditEvent({
-    userId: admin.id,
-    action: "product.create",
-    details: { productId: created.id, slug: created.slug },
-  });
 
   revalidatePath("/produtos");
   redirect(`/produtos/${created.id}`);
@@ -175,6 +171,7 @@ export async function updateProductAction(
         });
       }
       await tx.product.update({ where: { id }, data: dataFrom(parsed.data) });
+      await logAuditEvent({ userId: admin.id, action: "product.update", details: { productId: id, slug: parsed.data.slug } }, tx);
     });
   } catch (error) {
     if (isUniqueViolation(error)) {
@@ -184,11 +181,6 @@ export async function updateProductAction(
     return { errors: { form: "Não foi possível salvar o curso." } };
   }
 
-  await logAuditEvent({
-    userId: admin.id,
-    action: "product.update",
-    details: { productId: id, slug: parsed.data.slug },
-  });
 
   revalidatePath("/produtos");
   revalidatePath(`/produtos/${id}`);
@@ -204,16 +196,11 @@ export async function deleteProductAction(id: string): Promise<void> {
   });
   if (!current) return;
 
-  await prisma.product.update({
-    where: { id },
-    data: { deletedAt: new Date(), isActive: false },
-  });
-
-  await logAuditEvent({
+  await mutateAndAudit({
     userId: admin.id,
     action: "product.delete",
     details: { productId: id, slug: current.slug },
-  });
+  }, tx => tx.product.update({ where: { id }, data: { deletedAt: new Date(), isActive: false } }));
 
   revalidatePath("/produtos");
   redirect("/produtos");
@@ -221,7 +208,7 @@ export async function deleteProductAction(id: string): Promise<void> {
 
 /**
  * Substitui a composição de módulos de um curso pelo conjunto enviado.
- * Ignorado quando o curso concede tudo (grantsAll).
+ * Para acesso total, define a grade obrigatória do certificado.
  */
 export async function setProductCoursesAction(
   productId: string,
@@ -229,11 +216,13 @@ export async function setProductCoursesAction(
 ): Promise<void> {
   const admin = await requireAdminOrRedirect();
 
-  const courseIds = formData.getAll("courseIds").filter(
-    (v): v is string => typeof v === "string" && v.length > 0,
-  );
+  const parsedIds = z.array(z.string().uuid()).max(500).safeParse(formData.getAll("courseIds"));
+  if (!z.string().uuid().safeParse(productId).success || !parsedIds.success) return;
+  const courseIds = [...new Set(parsedIds.data)];
 
   await prisma.$transaction(async (tx) => {
+    const valid = await tx.course.count({ where: { id: { in: courseIds }, deletedAt: null, isArchived: false } });
+    if (valid !== courseIds.length) throw new Error("A composição contém módulos indisponíveis.");
     await tx.productCourse.deleteMany({ where: { productId } });
     if (courseIds.length > 0) {
       await tx.productCourse.createMany({
@@ -241,13 +230,9 @@ export async function setProductCoursesAction(
         skipDuplicates: true,
       });
     }
+    await logAuditEvent({ userId: admin.id, action: "product.set_courses", details: { productId, count: courseIds.length } }, tx);
   });
 
-  await logAuditEvent({
-    userId: admin.id,
-    action: "product.set_courses",
-    details: { productId, count: courseIds.length },
-  });
 
   revalidatePath(`/produtos/${productId}`);
 }

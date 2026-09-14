@@ -33,7 +33,7 @@ export async function getUserAccess(userId: string): Promise<UserAccess> {
 
   const now = new Date();
   const entitlements = await prisma.entitlement.findMany({
-    where: { userId, expiresAt: { gt: now } },
+    where: { userId, expiresAt: { gt: now }, purchase: { status: 'PAID', accessSuspended: false } },
     select: { scope: true, courseId: true },
   });
 
@@ -57,6 +57,7 @@ export async function hasCourseEntitlement(
     where: {
       userId,
       expiresAt: { gt: now },
+      purchase: { status: 'PAID', accessSuspended: false },
       OR: [{ scope: "ALL" }, { scope: "COURSE", courseId }],
     },
     select: { id: true },
@@ -66,9 +67,10 @@ export async function hasCourseEntitlement(
 
 /** O usuário tem QUALQUER acesso ativo (para telas de "é assinante?"). */
 export async function hasAnyActiveAccess(userId: string): Promise<boolean> {
+  if (!(await isUserActive(userId))) return false;
   const now = new Date();
   const found = await prisma.entitlement.findFirst({
-    where: { userId, expiresAt: { gt: now } },
+    where: { userId, expiresAt: { gt: now }, purchase: { status: 'PAID', accessSuspended: false } },
     select: { id: true },
   });
   return Boolean(found);
@@ -87,9 +89,12 @@ export type StudentAccess = {
 
 export async function resolveStudentAccess(
   userId: string,
-  role: string,
 ): Promise<StudentAccess> {
-  const isStaff = role === "ADMIN" || role === "SUPER_ADMIN";
+  const current = await prisma.user.findFirst({
+    where: { id: userId, blockedAt: null, deletedAt: null }, select: { role: true },
+  });
+  if (!current) return { accessAll: false, hasAny: false, courseIds: new Set() };
+  const isStaff = current.role === 'ADMIN' || current.role === 'SUPER_ADMIN';
 
   const access = await getUserAccess(userId);
   const accessAll = isStaff || access.grantsAll;

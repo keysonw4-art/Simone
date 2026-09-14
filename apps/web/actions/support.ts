@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@repo/database";
 import { auth } from "@repo/auth";
+import { IdSchema, consumeRateLimit } from '@repo/auth/security';
 
 const NewTicketSchema = z.object({
   subject: z
@@ -61,6 +62,7 @@ export async function createTicketAction(
   formData: FormData,
 ): Promise<NewTicketFormState> {
   const user = await requireStudent();
+  if (!await consumeRateLimit('ticket-create', user.id, 5, 3600)) return { errors: { form: 'Limite de chamados atingido. Aguarde antes de abrir outro.' } };
 
   const parsed = NewTicketSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
@@ -116,6 +118,8 @@ export async function replyTicketAction(
   formData: FormData,
 ): Promise<ReplyTicketFormState> {
   const user = await requireStudent();
+  if (!IdSchema.safeParse(ticketId).success) return { errors: { form: 'Chamado inválido.' } };
+  if (!await consumeRateLimit('ticket-reply', user.id, 15, 60)) return { errors: { form: 'Aguarde antes de enviar outra mensagem.' } };
 
   const ticket = await prisma.supportTicket.findFirst({
     where: { id: ticketId, userId: user.id, deletedAt: null },

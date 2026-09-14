@@ -1,5 +1,7 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+import { enforceRateLimit } from "@repo/auth/security";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -75,6 +77,7 @@ export async function uploadMaterialAction(
   formData: FormData,
 ): Promise<MaterialFormState> {
   const admin = await requireAdminOrRedirect();
+  await enforceRateLimit("admin-material-upload", admin.id, 10, 600);
 
   const course = await prisma.course.findFirst({
     where: { id: courseId, deletedAt: null },
@@ -93,68 +96,39 @@ export async function uploadMaterialAction(
     return { errors: { file: "Selecione um arquivo." } };
   }
 
+  if (file.size > 3 * 1024 * 1024) return { errors: { file: "O limite por arquivo é 3 MB." } };
+  const filename = Array.from(file.name).map(char =>
+    char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127 || char === "/" || char === "\\" ? "_" : char
+  ).join("").slice(0, 180);
   const { title, description } = parsed.data;
-
-  // Determina o próximo order
-  const last = await prisma.material.findFirst({
-    where: { courseId, deletedAt: null },
-    orderBy: { order: "desc" },
-    select: { order: true },
-  });
-  const order = (last?.order ?? 0) + 1;
-
-  // Cria row primeiro pra ter o materialId no path
-  const material = await prisma.material.create({
-    data: {
-      courseId,
-      title,
-      description: description || null,
-      filename: file.name,
-      path: "", // temporário
-      sizeBytes: file.size,
-      mimeType: file.type || "application/octet-stream",
-      order,
-    },
-  });
-
-  const path = `courses/${courseId}/${material.id}`;
-
+  const materialId = randomUUID();
+  const path = `courses/${courseId}/${materialId}`;
+  let uploaded = false;
   try {
-    await uploadFile({
-      bucket: BUCKETS.ArquivosAlunos,
-      path,
-      file,
-      allowedMimes: ALLOWED_MATERIAL_MIMES,
+    // Storage I/O stays outside the DB transaction (no connection held during upload).
+    await uploadFile({ bucket: BUCKETS.ArquivosAlunos, path, file, allowedMimes: ALLOWED_MATERIAL_MIMES });
+    uploaded = true;
+    await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${"materials:" + courseId}, 0))::text`;
+      const last = await tx.material.findFirst({ where: { courseId, deletedAt: null }, orderBy: { order: "desc" }, select: { order: true } });
+      await tx.material.create({ data: {
+        id: materialId, courseId, title, description: description || null, filename, path,
+        sizeBytes: file.size, mimeType: file.type || "application/octet-stream", order: (last?.order ?? 0) + 1,
+      } });
+      await logAuditEvent({ userId: admin.id, action: "material.upload",
+        details: { materialId, courseId, filename, sizeBytes: file.size } }, tx);
     });
   } catch (error) {
-    // Rollback: remove a row se upload falhou
-    await prisma.material.delete({ where: { id: material.id } });
-    if (
-      error instanceof StorageValidationError ||
-      error instanceof StorageUploadError
-    ) {
+    if (uploaded) {
+      try { await deleteObject(BUCKETS.ArquivosAlunos, path); }
+      catch { console.error("[materials] orphan cleanup required", { path }); }
+    }
+    if (error instanceof StorageValidationError || error instanceof StorageUploadError) {
       return { errors: { file: error.message } };
     }
     console.error("[materials] upload failed:", error);
-    return { errors: { form: "Falha inesperada ao processar o upload." } };
+    return { errors: { form: "Não foi possível salvar o material." } };
   }
-
-  await prisma.material.update({
-    where: { id: material.id },
-    data: { path },
-  });
-
-  await logAuditEvent({
-    userId: admin.id,
-    action: "material.upload",
-    details: {
-      materialId: material.id,
-      courseId,
-      slug: course.slug,
-      filename: file.name,
-      sizeBytes: file.size,
-    },
-  });
 
   revalidatePath(`/cursos/${courseId}`);
   return { errors: {} };
@@ -172,6 +146,19 @@ export async function deleteMaterialAction(
   });
   if (!material) return;
 
+
+  await prisma.$transaction(async tx => {
+    await tx.material.update({
+    where: { id: materialId },
+    data: { deletedAt: new Date() },
+  });
+    await logAuditEvent({
+    userId: admin.id,
+    action: "material.delete",
+    details: { materialId, courseId, filename: material.filename },
+  }, tx);
+  });
+
   // Tenta apagar do bucket; se falhar, seguimos com soft delete DB (arquivo vira órfão)
   if (material.path) {
     try {
@@ -181,16 +168,6 @@ export async function deleteMaterialAction(
     }
   }
 
-  await prisma.material.update({
-    where: { id: materialId },
-    data: { deletedAt: new Date() },
-  });
-
-  await logAuditEvent({
-    userId: admin.id,
-    action: "material.delete",
-    details: { materialId, courseId, filename: material.filename },
-  });
 
   revalidatePath(`/cursos/${courseId}`);
 }
@@ -218,21 +195,22 @@ async function moveMaterial(
   });
   if (!neighbor) return;
 
-  await prisma.$transaction([
-    prisma.material.update({
+  await prisma.$transaction(async tx => {
+    await Promise.all([
+    tx.material.update({
       where: { id: current.id },
       data: { order: neighbor.order },
     }),
-    prisma.material.update({
+    tx.material.update({
       where: { id: neighbor.id },
       data: { order: current.order },
     }),
-  ]);
-
-  await logAuditEvent({
+    ]);
+    await logAuditEvent({
     userId: admin.id,
     action: "material.reorder",
     details: { materialId, courseId, direction, swappedWith: neighbor.id },
+  }, tx);
   });
 
   revalidatePath(`/cursos/${courseId}`);

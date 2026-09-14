@@ -1,3 +1,4 @@
+import { requireAdminPage } from "@/lib/requireAdmin";
 import Link from "next/link";
 import {
   Users,
@@ -66,6 +67,7 @@ async function loadSignupsByMonth(months = 6) {
 }
 
 export default async function DashboardPage() {
+  await requireAdminPage();
   const since = thirtyDaysAgo();
 
   const [

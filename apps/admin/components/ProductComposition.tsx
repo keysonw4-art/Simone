@@ -43,15 +43,6 @@ export function ProductComposition({
 }) {
   const selected = new Set(selectedIds);
 
-  if (disabled) {
-    return (
-      <div className="bg-[var(--color-brand-gold)]/5 border border-[var(--color-brand-gold)]/20 rounded-sm p-6 text-sm text-[var(--color-brand-charcoal)]/70">
-        Este curso <strong>concede acesso a tudo</strong>. A composição por módulos
-        não se aplica — o aluno acessa todos os módulos (inclusive os futuros).
-      </div>
-    );
-  }
-
   if (modules.length === 0) {
     return (
       <div className="bg-white border border-black/5 rounded-sm p-6 text-sm text-[var(--color-brand-charcoal)]/50">
@@ -62,6 +53,7 @@ export function ProductComposition({
 
   return (
     <form action={action} className="flex flex-col gap-4">
+      {disabled && <p className="text-sm text-[var(--color-brand-charcoal)]/70">Este curso libera todos os módulos. Selecione abaixo apenas a grade obrigatória para emissão do certificado; os demais continuam acessíveis.</p>}
       <div className="bg-white border border-black/5 rounded-sm divide-y divide-black/5">
         {modules.map((m) => (
           <label

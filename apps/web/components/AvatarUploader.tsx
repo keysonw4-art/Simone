@@ -1,8 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import { useActionState, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
-import { ImagePlus, Trash2, UserCircle } from "lucide-react";
+import { Trash2, UserCircle } from "lucide-react";
 import {
   removeAvatarAction,
   uploadAvatarAction,
@@ -60,7 +61,7 @@ export function AvatarUploader({ initialUrl }: { initialUrl: string | null }) {
       <div className="flex items-start gap-6 flex-wrap">
         <div className="w-24 h-24 rounded-full overflow-hidden bg-[var(--color-brand-charcoal)]/5 border border-black/5 flex items-center justify-center flex-shrink-0">
           {currentUrl ? (
-            <img
+            <Image unoptimized width={96} height={96}
               src={currentUrl}
               alt="Foto de perfil"
               className="w-full h-full object-cover"
@@ -75,13 +76,14 @@ export function AvatarUploader({ initialUrl }: { initialUrl: string | null }) {
             Foto de perfil
           </h3>
           <p className="text-[10px] text-[var(--color-brand-charcoal)]/50 mb-4 leading-relaxed">
-            JPG, PNG, WebP, GIF ou AVIF. Máximo 5 MB. Convertida
+            JPG, PNG, WebP, GIF ou AVIF. Máximo 3 MB. Convertida
             automaticamente para WebP e mantida em armazenamento privado.
           </p>
 
           <form action={formAction} className="flex flex-col gap-3">
             <input
               type="file"
+              onChange={(e) => e.currentTarget.setCustomValidity((e.currentTarget.files?.[0]?.size ?? 0) > 3 * 1024 * 1024 ? "O limite é 3 MB." : "")}
               name="file"
               accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
               required

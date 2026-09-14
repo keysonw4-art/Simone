@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@repo/database";
 import type { Role } from "@repo/database";
 import { requireAdmin, UnauthorizedError } from "../lib/requireAdmin";
-import { logAuditEvent } from "../lib/audit";
+import { mutateAndAudit } from "../lib/audit";
 
 const ASSIGNABLE_ROLES: Role[] = ["STUDENT", "SUPPORT", "ADMIN"];
 
@@ -49,12 +49,7 @@ export async function updateUserRoleAction(
   }
   if (target.role === newRole) return { ok: true };
 
-  await prisma.user.update({
-    where: { id: targetUserId },
-    data: { role: newRole },
-  });
-
-  await logAuditEvent({
+  await mutateAndAudit({
     userId: admin.id,
     action: "user.role_change",
     details: {
@@ -63,7 +58,8 @@ export async function updateUserRoleAction(
       from: target.role,
       to: newRole,
     },
-  });
+  }, tx => tx.user.update({ where: { id: targetUserId, role: target.role, deletedAt: null },
+    data: { role: newRole, sessionVersion: { increment: 1 } } }));
 
   revalidatePath("/alunos");
   revalidatePath(`/alunos/${targetUserId}`);
@@ -99,16 +95,12 @@ export async function toggleUserBlockAction(
 
   // O acesso é cortado imediatamente pelo choke point isUserActive (entitlements),
   // então basta marcar/desmarcar blockedAt.
-  await prisma.user.update({
-    where: { id: targetUserId },
-    data: { blockedAt: nextBlockedAt },
-  });
-
-  await logAuditEvent({
+  await mutateAndAudit({
     userId: admin.id,
     action: wasBlocked ? "user.unblock" : "user.block",
     details: { targetUserId, targetPublicId: target.publicId },
-  });
+  }, tx => tx.user.update({ where: { id: targetUserId, role: target.role, blockedAt: target.blockedAt, deletedAt: null },
+    data: { blockedAt: nextBlockedAt, sessionVersion: { increment: 1 } } }));
 
   revalidatePath("/alunos");
   revalidatePath(`/alunos/${targetUserId}`);

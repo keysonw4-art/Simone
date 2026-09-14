@@ -1,156 +1,75 @@
 "use server";
 
-import crypto from "crypto";
+import { createHash, randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@repo/database";
 import { sendPasswordResetEmail } from "@repo/email";
+import { consumeRateLimit, requestIp, PasswordSchema, EmailSchema } from "./security";
 
-const TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
-const MAX_REQUESTS_PER_WINDOW = 3; // por usuário
-const REQUEST_WINDOW_MS = 15 * 60 * 1000;
+const hashToken = (raw: string) => createHash("sha256").update(raw).digest("hex");
+export type ResetRequestState = { ok: true } | { error: string } | undefined;
+export type ResetPasswordState = { ok: true } | { error: string } | undefined;
 
-function hashToken(raw: string): string {
-  return crypto.createHash("sha256").update(raw).digest("hex");
-}
-
-const PasswordRules = z
-  .string()
-  .min(10, "Senha deve ter ao menos 10 caracteres")
-  .max(72, "Senha deve ter no máximo 72 caracteres")
-  .refine((v) => /[a-zA-Z]/.test(v), "Senha deve conter ao menos 1 letra")
-  .refine((v) => /[0-9]/.test(v), "Senha deve conter ao menos 1 número");
-
-// ---------------------------------------------------------------------------
-// 1) Pedir redefinição — "esqueci minha senha"
-// ---------------------------------------------------------------------------
-
-const RequestSchema = z.object({
-  email: z.string().trim().toLowerCase().email("E-mail inválido").max(120),
-});
-
-export type ResetRequestState =
-  | { ok: true }
-  | { error: string }
-  | undefined;
-
-/**
- * Gera um token de redefinição e envia por e-mail. Resposta é SEMPRE genérica
- * (não revela se o e-mail existe) — só o formato inválido retorna erro.
- */
-export async function requestPasswordResetAction(
-  _prev: ResetRequestState,
-  formData: FormData,
-): Promise<ResetRequestState> {
-  const parsed = RequestSchema.safeParse({ email: formData.get("email") });
-  if (!parsed.success) {
-    return { error: "Informe um e-mail válido." };
-  }
-  const { email } = parsed.data;
-
+export async function requestPasswordResetAction(_prev: ResetRequestState, formData: FormData): Promise<ResetRequestState> {
+  const parsed = EmailSchema.safeParse(formData.get("email"));
+  if (!parsed.success) return { error: "Informe um e-mail válido." };
+  const email = parsed.data;
+  const ip = await requestIp();
+  if (!await consumeRateLimit("reset-ip", ip, 10, 900)) return { ok: true };
+  if (!await consumeRateLimit("reset-email", email, 3, 900)) return { ok: true };
   const user = await prisma.user.findFirst({
     where: { email, deletedAt: null, blockedAt: null },
-    select: { id: true, email: true, name: true, passwordHash: true },
+    select: { id: true, email: true, name: true, passwordHash: true, sessionVersion: true },
   });
-
-  // Só emite token para conta existente com login por senha.
-  if (user && user.passwordHash) {
-    const recent = await prisma.passwordResetToken.count({
-      where: {
-        userId: user.id,
-        createdAt: { gt: new Date(Date.now() - REQUEST_WINDOW_MS) },
-      },
+  if (user?.passwordHash) {
+    const token = randomBytes(32).toString("hex");
+    await prisma.passwordResetToken.create({
+      data: { userId: user.id, tokenHash: hashToken(token), sessionVersion: user.sessionVersion,
+        expiresAt: new Date(Date.now() + 3600_000) },
     });
-
-    if (recent < MAX_REQUESTS_PER_WINDOW) {
-      const rawToken = crypto.randomBytes(32).toString("hex");
-      await prisma.passwordResetToken.create({
-        data: {
-          userId: user.id,
-          tokenHash: hashToken(rawToken),
-          expiresAt: new Date(Date.now() + TOKEN_TTL_MS),
-        },
-      });
-      // Fail-safe: e-mail nunca lança; se falhar, só loga.
-      await sendPasswordResetEmail({
-        to: user.email,
-        name: user.name,
-        token: rawToken,
-      });
-    }
+    await sendPasswordResetEmail({ to: user.email, name: user.name, token });
   }
-
   return { ok: true };
 }
 
-// ---------------------------------------------------------------------------
-// 2) Redefinir de fato — a partir do link
-// ---------------------------------------------------------------------------
+const ResetSchema = z.object({
+  token: z.string().regex(/^[a-f0-9]{64}$/),
+  password: PasswordSchema,
+  confirm: z.string().max(72),
+}).refine(d => d.password === d.confirm, { message: "As senhas não conferem" });
 
-const ResetSchema = z
-  .object({
-    token: z.string().trim().min(1),
-    password: PasswordRules,
-    confirm: z.string(),
-  })
-  .refine((d) => d.password === d.confirm, {
-    path: ["confirm"],
-    message: "As senhas não conferem",
-  });
-
-export type ResetPasswordState =
-  | { ok: true }
-  | { error: string }
-  | undefined;
-
-/**
- * Valida o token e grava a nova senha. Invalida o token usado e quaisquer
- * outros tokens pendentes do mesmo usuário.
- */
-export async function resetPasswordAction(
-  _prev: ResetPasswordState,
-  formData: FormData,
-): Promise<ResetPasswordState> {
-  const parsed = ResetSchema.safeParse({
-    token: formData.get("token"),
-    password: formData.get("password"),
-    confirm: formData.get("confirm"),
-  });
-  if (!parsed.success) {
-    const first = parsed.error.issues[0];
-    return { error: first?.message ?? "Dados inválidos." };
-  }
-  const { token, password } = parsed.data;
-
-  const record = await prisma.passwordResetToken.findUnique({
-    where: { tokenHash: hashToken(token) },
-    select: { id: true, userId: true, usedAt: true, expiresAt: true },
-  });
-
-  if (!record || record.usedAt || record.expiresAt < new Date()) {
-    return {
-      error:
-        "Este link é inválido ou já expirou. Peça um novo em 'Esqueci minha senha'.",
-    };
-  }
-
-  const passwordHash = await bcrypt.hash(password, 10);
-
-  await prisma.$transaction([
-    prisma.user.update({
-      where: { id: record.userId },
-      data: { passwordHash },
-    }),
-    prisma.passwordResetToken.update({
-      where: { id: record.id },
+export async function resetPasswordAction(_prev: ResetPasswordState, formData: FormData): Promise<ResetPasswordState> {
+  const invalid = { error: "Link inválido, utilizado ou expirado. Peça um novo em 'Esqueci minha senha'." };
+  if (!await consumeRateLimit("reset-consume-ip", await requestIp(), 15, 900)) return invalid;
+  const parsed = ResetSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: "Verifique o link e use senhas iguais, com letras e números (10 a 72 bytes)." };
+  const tokenHash = hashToken(parsed.data.token);
+  const record = await prisma.passwordResetToken.findUnique({ where: { tokenHash } });
+  if (!record || record.usedAt || record.expiresAt <= new Date() || record.sessionVersion < 0) return invalid;
+  const passwordHash = await bcrypt.hash(parsed.data.password, 12);
+  const changed = await prisma.$transaction(async tx => {
+    // Serialize reset and user revocation on the user row; two different tokens
+    // for the same credential generation must not both change the password.
+    const user = await tx.user.updateMany({
+      where: { id: record.userId, blockedAt: null, deletedAt: null, sessionVersion: record.sessionVersion },
+      data: { sessionVersion: { increment: 1 } },
+    });
+    if (user.count !== 1) return false;
+    const claimed = await tx.passwordResetToken.updateMany({
+      where: { id: record.id, usedAt: null, expiresAt: { gt: new Date() }, sessionVersion: record.sessionVersion },
       data: { usedAt: new Date() },
-    }),
-    // Invalida qualquer outro token pendente do usuário.
-    prisma.passwordResetToken.updateMany({
-      where: { userId: record.userId, usedAt: null, id: { not: record.id } },
-      data: { usedAt: new Date() },
-    }),
-  ]);
-
-  return { ok: true };
+    });
+    if (claimed.count !== 1) throw new Error("RESET_TOKEN_CONFLICT");
+    await tx.user.update({ where: { id: record.userId }, data: { passwordHash } });
+    await tx.passwordResetToken.updateMany({
+      where: { userId: record.userId, usedAt: null }, data: { usedAt: new Date() },
+    });
+    await tx.auditLog.create({ data: { userId: record.userId, action: "user.password_reset" } });
+    return true;
+  }).catch(error => {
+    if (error instanceof Error && error.message === "RESET_TOKEN_CONFLICT") return false;
+    throw error;
+  });
+  return changed ? { ok: true } : invalid;
 }

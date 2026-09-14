@@ -1,97 +1,54 @@
 import { randomBytes } from "node:crypto";
-import { prisma } from "@repo/database";
-import { hasCourseEntitlement } from "./entitlements";
+import { prisma, type Certificate, type CertificateType } from "@repo/database";
+import { PurchaseSnapshotSchema } from "./commerce";
 
-/**
- * Emite o certificado se o aluno completou 100% das aulas do curso.
- * Idempotente: se já existe certificado (userId, courseId), retorna o existente.
- * Retorna null se: sem entitlement ativo, curso sem aulas, curso não
- * encontrado, ou aluno incompleto.
- */
-export async function issueCertificateIfEligible(
-  userId: string,
-  courseId: string,
-) {
-  const existing = await prisma.certificate.findUnique({
-    where: { userId_courseId: { userId, courseId } },
-  });
-  if (existing) return existing;
-
-  // Defesa em profundidade: só emite se o aluno tem/teve direito de acesso ao
-  // curso. Sem isso, progresso forjado geraria certificado oficial de graça.
-  const entitled = await hasCourseEntitlement(userId, courseId);
-  if (!entitled) return null;
-
-  const course = await prisma.course.findFirst({
-    where: { id: courseId, deletedAt: null },
-    select: {
-      id: true,
-      title: true,
-      modules: {
-        where: { deletedAt: null },
-        select: {
-          lessons: {
-            where: { deletedAt: null },
-            select: { id: true },
-          },
-        },
-      },
-    },
-  });
-  if (!course) return null;
-
-  const allLessonIds = course.modules.flatMap((m) =>
-    m.lessons.map((l) => l.id),
-  );
-  if (allLessonIds.length === 0) return null;
-
-  const completed = await prisma.progress.count({
-    where: {
-      userId,
-      lessonId: { in: allLessonIds },
-      isCompleted: true,
-    },
-  });
-  if (completed < allLessonIds.length) return null;
-
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { name: true },
-  });
-  if (!user) return null;
-
-  const year = new Date().getFullYear();
-
-  try {
-    const cert = await prisma.$transaction(async (tx) => {
-      // Contador segue só como métrica interna de emissões. O código PÚBLICO
-      // leva um token aleatório — NÃO pode ser sequencial/enumerável, senão
-      // dá pra iterar CERT-AAAA-NNNNN e colher nome+curso de toda a base.
-      await tx.certificateCounter.upsert({
-        where: { year },
-        update: { lastNumber: { increment: 1 } },
-        create: { year, lastNumber: 1 },
-      });
-      const token = randomBytes(6).toString("hex").toUpperCase(); // 12 hex
-      const publicCode = `CERT-${year}-${token}`;
-      return tx.certificate.create({
-        data: {
-          publicCode,
-          userId,
-          courseId,
-          // Nunca cai pra e-mail (vazaria PII na página pública de validação).
-          studentName: user.name?.trim() || "Aluno",
-          courseTitle: course.title,
-        },
-      });
+/** The entitlement, paid order and complete curriculum are checked at issuance. */
+export async function issueCertificateIfEligible(userId: string, courseId: string) {
+  return prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${"certificate:" + userId}, 0))::text`;
+    const user = await tx.user.findFirst({ where: { id: userId, deletedAt: null, blockedAt: null } });
+    if (!user) return null;
+    const purchases = await tx.purchase.findMany({
+      where: { userId, status: "PAID", accessSuspended: false,
+        entitlements: { some: { expiresAt: { gt: new Date() }, OR: [{ scope: "ALL" }, { courseId }] } } },
+      include: { product: { include: { productCourses: true } }, course: true, entitlements: true },
     });
-    return cert;
-  } catch (error) {
-    // Race: outro request emitiu no meio-tempo. Retorna o existente.
-    const found = await prisma.certificate.findUnique({
-      where: { userId_courseId: { userId, courseId } },
-    });
-    if (found) return found;
-    throw error;
-  }
+    let issued: Certificate | null = null;
+    for (const purchase of purchases) {
+      const parsed = PurchaseSnapshotSchema.safeParse(purchase.snapshot);
+      const snapshot = parsed.success ? parsed.data : null;
+      // Legacy/manual purchases use the administrator's configured curriculum.
+      const ids = purchase.productId
+        ? snapshot?.courseIds ?? purchase.product?.productCourses.map(c => c.courseId) ?? []
+        : purchase.courseId ? [purchase.courseId] : [];
+      const type: CertificateType | null = purchase.productId
+        ? (snapshot ? snapshot.certificateType : purchase.product?.certificateType ?? null)
+        : "DECLARATION";
+      if (!type || !ids.length || !ids.includes(courseId)) continue;
+      if (!ids.every(id => purchase.entitlements.some(e => e.expiresAt > new Date() && (e.scope === "ALL" || e.courseId === id)))) continue;
+      const existing = await tx.certificate.findFirst({ where: { userId,
+        ...(purchase.productId ? { productId: purchase.productId } : { courseId, productId: null }) } });
+      if (existing) { issued = existing; continue; }
+      const courses = await tx.course.findMany({ where: { id: { in: ids }, deletedAt: null, isArchived: false },
+        select: { id: true, modules: { where: { deletedAt: null }, select: {
+          lessons: { where: { deletedAt: null }, select: { id: true } } } } } });
+      if (courses.length !== ids.length) continue;
+      const groups = courses.map(c => c.modules.flatMap(m => m.lessons.map(l => l.id)));
+      if (groups.some(lessons => !lessons.length)) continue;
+      const lessonIds = groups.flat();
+      const completed = await tx.progress.count({ where: { userId, lessonId: { in: lessonIds }, isCompleted: true } });
+      if (completed !== lessonIds.length) continue;
+      const year = new Date().getFullYear();
+      await tx.certificateCounter.upsert({ where: { year }, update: { lastNumber: { increment: 1 } }, create: { year, lastNumber: 1 } });
+      issued = await tx.certificate.create({ data: {
+        userId, courseId: purchase.productId ? null : courseId, productId: purchase.productId, type,
+        publicCode: `CERT-${year}-${randomBytes(16).toString("hex").toUpperCase()}`,
+        studentName: user.name?.trim() || "Aluno",
+        courseTitle: snapshot?.name ?? purchase.product?.name ?? purchase.course?.title ?? "Curso",
+      } });
+      await tx.auditLog.create({ data: { userId, action: "certificate.issue",
+        details: JSON.stringify({ certificateId: issued.id, purchaseId: purchase.id, type, courseIds: ids }) } });
+    }
+    return issued;
+  }, { timeout: 15_000 });
 }

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import {
   CheckCircle2,
@@ -19,7 +20,7 @@ export default async function CursosIndexPage({
   const [user, sp] = await Promise.all([requireSession(), searchParams]);
   const justBought = sp?.compra === "sucesso" || sp?.assinatura === "sucesso";
 
-  const access = await resolveStudentAccess(user.id, user.role);
+  const access = await resolveStudentAccess(user.id);
 
   if (access.hasAny) {
     const courses = await prisma.course.findMany({
@@ -83,8 +84,7 @@ export default async function CursosIndexPage({
               >
                 <div className="w-full h-48 bg-[var(--color-brand-charcoal)]/5 flex items-center justify-center relative overflow-hidden">
                   {course.thumbnail ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <Image unoptimized fill sizes="(max-width: 768px) 100vw, 33vw"
                       src={course.thumbnail}
                       alt={course.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
@@ -197,8 +197,7 @@ export default async function CursosIndexPage({
             >
               <div className="w-full h-40 bg-[var(--color-brand-charcoal)]/5 flex items-center justify-center relative overflow-hidden">
                 {lesson.module.course.thumbnail ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                  <Image unoptimized fill sizes="(max-width: 768px) 100vw, 33vw"
                     src={lesson.module.course.thumbnail}
                     alt={lesson.module.course.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"

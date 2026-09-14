@@ -6,6 +6,9 @@ import { Montserrat, Playfair_Display } from "next/font/google";
 const montserrat = Montserrat({ subsets: ["latin"], variable: "--font-montserrat", weight: ["300", "400", "500", "600", "700"] });
 const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-didot", weight: ["400", "500", "600", "700"] });
 
+// Per-request CSP nonces require dynamic rendering, including public catalog pages.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Simone Mendes | Admin",
   description: "Painel Administrativo - Educação Digital",

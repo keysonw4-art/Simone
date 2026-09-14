@@ -1,154 +1,74 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { prisma } from "@repo/database";
-import { requireAdmin, UnauthorizedError } from "../lib/requireAdmin";
+import { IdSchema, enforceRateLimit } from "@repo/auth/security";
+import { requireAdmin } from "../lib/requireAdmin";
 import { logAuditEvent } from "../lib/audit";
 
-const AVULSO_ACCESS_MONTHS = 12;
-
 function addMonths(date: Date, months: number): Date {
-  const d = new Date(date);
-  d.setMonth(d.getMonth() + months);
-  return d;
+  const result = new Date(date);
+  const day = result.getUTCDate();
+  result.setUTCDate(1);
+  result.setUTCMonth(result.getUTCMonth() + months);
+  const lastDay = new Date(Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0)).getUTCDate();
+  result.setUTCDate(Math.min(day, lastDay));
+  return result;
 }
 
-async function requireAdminOrRedirect() {
-  try {
-    return await requireAdmin();
-  } catch (error) {
-    if (error instanceof UnauthorizedError) redirect("/login");
-    throw error;
-  }
-}
-
-/**
- * Concede acesso manualmente (founder/cortesia, sem Stripe). O `target` vem do
- * form como "product:<id>" ou "course:<id>". Cria uma Purchase (valor 0) e
- * materializa os Entitlements — mesma regra do webhook.
- */
-export async function grantAccessAction(
-  userId: string,
-  formData: FormData,
-): Promise<void> {
-  const admin = await requireAdminOrRedirect();
-
-  const target = String(formData.get("target") ?? "");
-  const [kind, id] = target.split(":");
-  if (!kind || !id) {
-    revalidatePath(`/alunos/${userId}`);
-    return;
-  }
-
-  const now = new Date();
-
-  if (kind === "product") {
-    const product = await prisma.product.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        accessMonths: true,
-        grantsAll: true,
-        productCourses: { select: { courseId: true } },
-      },
-    });
-    if (!product) return;
-    const expiresAt = addMonths(now, product.accessMonths);
-
-    await prisma.$transaction(async (tx) => {
-      const purchase = await tx.purchase.create({
-        data: {
-          userId,
-          productId: product.id,
-          amountCents: 0,
-          status: "PAID",
-          purchasedAt: now,
-          expiresAt,
-        },
-      });
-      if (product.grantsAll) {
-        await tx.entitlement.create({
-          data: { userId, scope: "ALL", expiresAt, purchaseId: purchase.id },
-        });
-      } else if (product.productCourses.length > 0) {
-        await tx.entitlement.createMany({
-          data: product.productCourses.map((pc) => ({
-            userId,
-            scope: "COURSE" as const,
-            courseId: pc.courseId,
-            expiresAt,
-            purchaseId: purchase.id,
-          })),
-        });
-      }
-    });
-
-    await logAuditEvent({
-      userId: admin.id,
-      action: "access.grant_product",
-      details: { userId, productId: product.id },
-    });
-  } else if (kind === "course") {
-    const course = await prisma.course.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-    if (!course) return;
-    const expiresAt = addMonths(now, AVULSO_ACCESS_MONTHS);
-
-    await prisma.$transaction(async (tx) => {
-      const purchase = await tx.purchase.create({
-        data: {
-          userId,
-          courseId: course.id,
-          amountCents: 0,
-          status: "PAID",
-          purchasedAt: now,
-          expiresAt,
-        },
-      });
-      await tx.entitlement.create({
-        data: {
-          userId,
-          scope: "COURSE",
-          courseId: course.id,
-          expiresAt,
-          purchaseId: purchase.id,
-        },
-      });
-    });
-
-    await logAuditEvent({
-      userId: admin.id,
-      action: "access.grant_module",
-      details: { userId, courseId: course.id },
-    });
-  }
-
+export async function grantAccessAction(userId: string, formData: FormData): Promise<void> {
+  const admin = await requireAdmin();
+  await enforceRateLimit("admin-grant", admin.id, 20, 60);
+  const [kind, id, extra] = String(formData.get("target") ?? "").split(":");
+  if (!IdSchema.safeParse(userId).success || !IdSchema.safeParse(id).success || extra || (kind !== "product" && kind !== "course")) return;
+  await prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${"checkout:" + kind + ":" + id}, 0))::text`;
+    const target = await tx.user.findFirst({ where: { id: userId, deletedAt: null, blockedAt: null } });
+    if (!target || target.role !== "STUDENT") return;
+    const now = new Date();
+    const existing = await tx.purchase.findFirst({ where: { userId, status: "PAID", accessSuspended: false,
+      ...(kind === "product" ? { productId: id } : { courseId: id }),
+      entitlements: { some: { expiresAt: { gt: now } } } } });
+    if (existing) return; // Double clicks cannot create another active courtesy purchase.
+    const product = kind === "product" ? await tx.product.findFirst({ where: { id, deletedAt: null, isActive: true },
+      include: { productCourses: { include: { course: true } } } }) : null;
+    const course = kind === "course" ? await tx.course.findFirst({ where: { id, deletedAt: null, isArchived: false } }) : null;
+    if (!product && !course) return;
+    const courseIds = product
+      ? product.productCourses.filter(c => !c.course.deletedAt && !c.course.isArchived).map(c => c.courseId)
+      : [course!.id];
+    if (!product?.grantsAll && !courseIds.length) return;
+    if (product?.maxSeats !== null && product?.maxSeats !== undefined) {
+      const seats = await tx.purchase.count({ where: { productId: id,
+        OR: [{ status: "PAID" }, { status: "PENDING", checkoutExpiresAt: { gt: now } }] } });
+      if (seats >= product.maxSeats) throw new Error("Não há vagas disponíveis neste curso.");
+    }
+    const accessMonths = product?.accessMonths ?? 12;
+    const expiresAt = addMonths(now, accessMonths);
+    const purchase = await tx.purchase.create({ data: { userId, productId: product?.id, courseId: course?.id,
+      amountCents: 0, status: "PAID", purchasedAt: now, expiresAt,
+      snapshot: { version: 1, kind, id: id!, name: product?.name ?? course!.title, priceId: "price_manual",
+        priceCents: 0, currency: "brl", accessMonths, grantsAll: product?.grantsAll ?? false,
+        courseIds, certificateType: product ? product.certificateType : "DECLARATION" } } });
+    await tx.entitlement.createMany({ data: product?.grantsAll
+      ? [{ userId, scope: "ALL", expiresAt, purchaseId: purchase.id }]
+      : courseIds.map(courseId => ({ userId, scope: "COURSE", courseId, expiresAt, purchaseId: purchase.id })) });
+    if (product) await tx.product.update({ where: { id: product.id }, data: { seatsSold: { increment: 1 } } });
+    await logAuditEvent({ userId: admin.id, action: "access.grant_" + kind,
+      details: { userId, purchaseId: purchase.id, targetId: id } }, tx);
+  });
   revalidatePath(`/alunos/${userId}`);
 }
 
-/**
- * Revoga um acesso: expira os entitlements da compra (não-destrutivo, mantém
- * o histórico da Purchase).
- */
-export async function revokeAccessAction(
-  purchaseId: string,
-  userId: string,
-): Promise<void> {
-  const admin = await requireAdminOrRedirect();
-
-  await prisma.entitlement.updateMany({
-    where: { purchaseId },
-    data: { expiresAt: new Date() },
+export async function revokeAccessAction(purchaseId: string, userId: string): Promise<void> {
+  const admin = await requireAdmin();
+  if (!IdSchema.safeParse(purchaseId).success || !IdSchema.safeParse(userId).success) return;
+  await prisma.$transaction(async tx => {
+    const order = await tx.purchase.findFirst({ where: { id: purchaseId, userId } });
+    if (!order) return;
+    await tx.purchase.update({ where: { id: purchaseId }, data: { accessSuspended: true } });
+    await tx.entitlement.updateMany({ where: { purchaseId, userId }, data: { expiresAt: new Date() } });
+    await logAuditEvent({ userId: admin.id, action: "access.revoke", details: { purchaseId, userId } }, tx);
   });
-
-  await logAuditEvent({
-    userId: admin.id,
-    action: "access.revoke",
-    details: { purchaseId, userId },
-  });
-
   revalidatePath(`/alunos/${userId}`);
 }

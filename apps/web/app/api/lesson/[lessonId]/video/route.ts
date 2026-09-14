@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@repo/database";
 import { auth } from "@repo/auth";
 import { hasCourseEntitlement } from "@/lib/entitlements";
+import { IdSchema, consumeRateLimit } from '@repo/auth/security';
 
 export const dynamic = "force-dynamic";
 
@@ -26,9 +27,11 @@ export async function GET(
   }
 
   const { lessonId } = await ctx.params;
+  if (!IdSchema.safeParse(lessonId).success) return NextResponse.json({ error: 'invalid_id' }, { status: 400 });
+  if (!await consumeRateLimit('video', session.user.id, 60, 60)) return NextResponse.json({ error: 'rate_limited' }, { status: 429, headers: { 'Retry-After': '60' } });
 
   const lesson = await prisma.lesson.findFirst({
-    where: { id: lessonId, deletedAt: null },
+    where: { id: lessonId, deletedAt: null, module: { deletedAt: null, course: { deletedAt: null, isArchived: false } } },
     select: {
       id: true,
       vimeoVideoId: true,

@@ -1,3 +1,5 @@
+import { requireAdminPage } from "@/lib/requireAdmin";
+import { Pagination, parsePage, PAGE_SIZE } from "@repo/ui/pagination";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, Lock } from "lucide-react";
@@ -15,17 +17,22 @@ const STATUS_LABELS: Record<TicketStatus, { label: string; color: string }> = {
 
 export default async function AdminTicketDetailPage({
   params,
+  searchParams,
 }: {
+  searchParams: Promise<{ page?: string }>;
   params: Promise<{ id: string }>;
 }) {
+  await requireAdminPage();
   const { id } = await params;
+  const page = parsePage((await searchParams).page);
 
   const ticket = await prisma.supportTicket.findFirst({
     where: { id, deletedAt: null },
     include: {
       user: { select: { id: true, name: true, email: true, publicId: true, role: true } },
       messages: {
-        orderBy: { createdAt: "asc" },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: PAGE_SIZE + 1, skip: (page - 1) * PAGE_SIZE,
         include: {
           author: { select: { id: true, name: true, email: true, role: true } },
         },
@@ -79,7 +86,7 @@ export default async function AdminTicketDetailPage({
       </header>
 
       <div className="flex flex-col gap-4 mb-10">
-        {ticket.messages.map((msg) => {
+        {[...ticket.messages.slice(0, PAGE_SIZE)].reverse().map((msg) => {
           const isStaff =
             msg.author.role === "ADMIN" ||
             msg.author.role === "SUPER_ADMIN" ||
@@ -144,6 +151,7 @@ export default async function AdminTicketDetailPage({
       </div>
 
       <TicketReplyForm ticketId={ticket.id} />
+      <Pagination page={page} hasMore={ticket.messages.length > PAGE_SIZE} href={`/suporte/${ticket.id}`} />
     </div>
   );
 }

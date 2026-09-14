@@ -1,3 +1,4 @@
+import { requireAdminPage } from "@/lib/requireAdmin";
 import Link from "next/link";
 import { Plus, Award, Sparkles, Users } from "lucide-react";
 import { prisma } from "@repo/database";
@@ -10,6 +11,7 @@ function formatBRL(cents: number): string {
 }
 
 export default async function ProdutosPage() {
+  await requireAdminPage();
   const products = await prisma.product.findMany({
     where: { deletedAt: null },
     orderBy: { order: "asc" },

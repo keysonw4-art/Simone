@@ -1,5 +1,6 @@
 "use server";
 
+import { consumeRateLimit } from "@repo/auth/security";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@repo/database";
 import {
@@ -29,6 +30,7 @@ export async function uploadCourseThumbnailAction(
     return { ok: false, error: "Acesso negado." };
   }
 
+  if (!await consumeRateLimit("admin-image-upload", admin.id, 10, 600)) return { ok: false, error: "Aguarde antes de enviar outra imagem." };
   const course = await prisma.course.findFirst({
     where: { id: courseId, deletedAt: null },
     select: { id: true, slug: true },
@@ -57,15 +59,16 @@ export async function uploadCourseThumbnailAction(
 
   const url = getPublicUrl(BUCKETS.ImagensPublicas, path);
 
-  await prisma.course.update({
+  await prisma.$transaction(async tx => {
+    await tx.course.update({
     where: { id: courseId },
     data: { thumbnail: url },
   });
-
-  await logAuditEvent({
+    await logAuditEvent({
     userId: admin.id,
     action: "course.thumbnail_upload",
     details: { courseId, slug: course.slug, path, size: file.size },
+  }, tx);
   });
 
   revalidatePath("/cursos");

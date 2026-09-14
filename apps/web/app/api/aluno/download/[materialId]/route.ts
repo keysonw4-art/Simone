@@ -3,6 +3,7 @@ import { prisma } from "@repo/database";
 import { auth } from "@repo/auth";
 import { BUCKETS, getSignedUrl } from "@repo/storage";
 import { hasCourseEntitlement } from "@/lib/entitlements";
+import { IdSchema, consumeRateLimit } from '@repo/auth/security';
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +17,11 @@ export async function GET(
   }
 
   const { materialId } = await ctx.params;
+  if (!IdSchema.safeParse(materialId).success) return NextResponse.json({ error: 'invalid_id' }, { status: 400 });
+  if (!await consumeRateLimit('download', session.user.id, 20, 60)) return NextResponse.json({ error: 'rate_limited' }, { status: 429, headers: { 'Retry-After': '60' } });
 
   const material = await prisma.material.findFirst({
-    where: { id: materialId, deletedAt: null },
+    where: { id: materialId, deletedAt: null, course: { deletedAt: null, isArchived: false } },
     select: {
       id: true,
       path: true,
@@ -71,5 +74,7 @@ export async function GET(
     return NextResponse.json({ error: "server_error" }, { status: 500 });
   }
 
-  return NextResponse.redirect(url, 302);
+  const response = NextResponse.redirect(url, 302);
+  response.headers.set('Cache-Control', 'private, no-store');
+  return response;
 }

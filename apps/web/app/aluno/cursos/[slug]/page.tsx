@@ -40,7 +40,7 @@ export default async function CourseDetailsPage({
   }
 
   // Acesso por-módulo: precisa ter direito a ESTE módulo (Course).
-  const access = await resolveStudentAccess(user.id, user.role);
+  const access = await resolveStudentAccess(user.id);
   if (!canAccess(access, course.id)) {
     redirect("/aluno/cursos");
   }
@@ -180,7 +180,7 @@ export default async function CourseDetailsPage({
             </p>
           </div>
         ) : (
-          course.modules.map((module, mIndex) => (
+          course.modules.map((module) => (
             <div
               key={module.id}
               className="bg-white border border-black/5 rounded-sm overflow-hidden shadow-sm"

@@ -19,12 +19,10 @@ if (typeof window === "undefined") {
 
 export const authConfig = {
   secret: process.env.AUTH_SECRET,
-  // Sessão JWT com validade de 7 dias (antes: default de 30) e renovação
-  // diária — reduz a janela de uma sessão roubada/de conta bloqueada.
+  // Absolute lifetime is checked below; DB revocation is checked in index.ts.
   session: {
     strategy: "jwt",
     maxAge: 60 * 60 * 24 * 7,
-    updateAge: 60 * 60 * 24,
   },
   pages: {
     signIn: "/login",
@@ -35,13 +33,17 @@ export const authConfig = {
       if (user) {
         token.id = user.id!;
         token.role = user.role;
+        token.sessionVersion = user.sessionVersion;
+        token.authTime = Math.floor(Date.now() / 1000);
       }
+      if (typeof token.authTime !== 'number' || Date.now() / 1000 - token.authTime >= 7 * 86400) return null;
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as Role;
+        session.user.sessionVersion = token.sessionVersion as number;
       }
       return session;
     },
