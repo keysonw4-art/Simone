@@ -6,10 +6,11 @@ import {
   BookOpen,
   PlayCircle,
   Sparkles,
+  GraduationCap,
 } from "lucide-react";
 import { prisma } from "@repo/database";
 import { requireSession } from "@/lib/subscriptionGuard";
-import { resolveStudentAccess } from "@/lib/entitlements";
+import { getStudentCatalog } from "@/lib/entitlements";
 import { PaymentConfirming } from "@/components/PaymentConfirming";
 
 export default async function CursosIndexPage({
@@ -20,19 +21,9 @@ export default async function CursosIndexPage({
   const [user, sp] = await Promise.all([requireSession(), searchParams]);
   const justBought = sp?.compra === "sucesso" || sp?.assinatura === "sucesso";
 
-  const access = await resolveStudentAccess(user.id);
+  const catalog = await getStudentCatalog(user.id);
 
-  if (access.hasAny) {
-    const courses = await prisma.course.findMany({
-      where: {
-        isArchived: false,
-        deletedAt: null,
-        ...(access.accessAll ? {} : { id: { in: [...access.courseIds] } }),
-      },
-      orderBy: { createdAt: "desc" },
-      include: { _count: { select: { modules: true } } },
-    });
-
+  if (catalog.hasAny) {
     return (
       <div className="max-w-7xl mx-auto px-6 py-16 md:py-24 relative z-10">
         {justBought && (
@@ -55,10 +46,10 @@ export default async function CursosIndexPage({
               Meus Cursos
             </p>
             <h1 className="font-serif text-4xl md:text-5xl text-[var(--color-brand-charcoal)] tracking-tight leading-[1.1]">
-              {access.accessAll ? "Seu catálogo completo" : "Seu conteúdo"}
+              {catalog.accessAll ? "Seu catálogo completo" : "Seus cursos"}
             </h1>
           </div>
-          {!access.accessAll && (
+          {!catalog.accessAll && (
             <Link
               href="/planos"
               className="inline-flex items-center gap-2 text-[10px] uppercase tracking-widest text-[var(--color-brand-sage)] hover:text-[var(--color-brand-charcoal)] transition-colors"
@@ -68,45 +59,36 @@ export default async function CursosIndexPage({
           )}
         </header>
 
-        {courses.length === 0 ? (
-          <div className="text-center py-16 bg-white border border-black/5 rounded-sm">
-            <p className="text-sm text-[var(--color-brand-charcoal)]/50 uppercase tracking-widest">
-              Nenhum módulo disponível no momento
-            </p>
-          </div>
-        ) : (
+        {/* CURSOS (Products) — o topo da hierarquia */}
+        {catalog.products.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {courses.map((course) => (
+            {catalog.products.map((product) => (
               <Link
-                key={course.id}
-                href={`/aluno/cursos/${course.slug}`}
+                key={product.slug}
+                href={`/aluno/produto/${product.slug}`}
                 className="group bg-white border border-black/5 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 flex flex-col"
               >
-                <div className="w-full h-48 bg-[var(--color-brand-charcoal)]/5 flex items-center justify-center relative overflow-hidden">
-                  {course.thumbnail ? (
-                    <Image unoptimized fill sizes="(max-width: 768px) 100vw, 33vw"
-                      src={course.thumbnail}
-                      alt={course.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                    />
-                  ) : (
-                    <BookOpen className="w-12 h-12 text-[var(--color-brand-charcoal)]/20" />
+                <div className="w-full h-40 bg-gradient-to-br from-[var(--color-brand-sage)]/10 to-[var(--color-brand-gold)]/10 flex items-center justify-center relative">
+                  <GraduationCap className="w-12 h-12 text-[var(--color-brand-sage)]/40" />
+                  {product.grantsAll && (
+                    <div className="absolute top-3 right-3 bg-[var(--color-brand-gold)] text-white text-[9px] uppercase tracking-widest font-medium px-2 py-1 rounded-sm">
+                      Acesso completo
+                    </div>
                   )}
-                  <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors"></div>
                 </div>
                 <div className="p-6 flex-1 flex flex-col">
                   <h3 className="font-serif text-xl text-[var(--color-brand-charcoal)] mb-2 group-hover:text-[var(--color-brand-sage)] transition-colors">
-                    {course.title}
+                    {product.name}
                   </h3>
-                  {course.description && (
+                  {product.tagline && (
                     <p className="text-xs text-[var(--color-brand-charcoal)]/60 line-clamp-2 mb-4 leading-relaxed">
-                      {course.description}
+                      {product.tagline}
                     </p>
                   )}
                   <div className="mt-auto flex items-center justify-between text-[10px] uppercase tracking-widest">
                     <span className="text-[var(--color-brand-charcoal)]/50">
-                      {course._count.modules}{" "}
-                      {course._count.modules === 1 ? "seção" : "seções"}
+                      {product.moduleCount}{" "}
+                      {product.moduleCount === 1 ? "módulo" : "módulos"}
                     </span>
                     <span className="text-[var(--color-brand-sage)] font-medium flex items-center gap-1">
                       Acessar{" "}
@@ -117,6 +99,53 @@ export default async function CursosIndexPage({
               </Link>
             ))}
           </div>
+        )}
+
+        {/* MÓDULOS AVULSOS — comprados soltos, sem Curso-pai */}
+        {catalog.avulsos.length > 0 && (
+          <section className="mt-16">
+            <h2 className="text-[10px] uppercase tracking-[0.3em] text-[var(--color-brand-charcoal)]/60 mb-6">
+              Módulos avulsos
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {catalog.avulsos.map((mod) => (
+                <Link
+                  key={mod.slug}
+                  href={`/aluno/cursos/${mod.slug}`}
+                  className="group bg-white border border-black/5 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 flex flex-col"
+                >
+                  <div className="w-full h-40 bg-[var(--color-brand-charcoal)]/5 flex items-center justify-center relative overflow-hidden">
+                    {mod.thumbnail ? (
+                      <Image unoptimized fill sizes="(max-width: 768px) 100vw, 33vw"
+                        src={mod.thumbnail}
+                        alt={mod.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                      />
+                    ) : (
+                      <BookOpen className="w-12 h-12 text-[var(--color-brand-charcoal)]/20" />
+                    )}
+                    <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors"></div>
+                  </div>
+                  <div className="p-6 flex-1 flex flex-col">
+                    <h3 className="font-serif text-xl text-[var(--color-brand-charcoal)] mb-2 group-hover:text-[var(--color-brand-sage)] transition-colors">
+                      {mod.title}
+                    </h3>
+                    {mod.description && (
+                      <p className="text-xs text-[var(--color-brand-charcoal)]/60 line-clamp-2 mb-4 leading-relaxed">
+                        {mod.description}
+                      </p>
+                    )}
+                    <div className="mt-auto flex items-center justify-end text-[10px] uppercase tracking-widest">
+                      <span className="text-[var(--color-brand-sage)] font-medium flex items-center gap-1">
+                        Acessar{" "}
+                        <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
         )}
       </div>
     );
