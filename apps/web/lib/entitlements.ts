@@ -153,8 +153,9 @@ export async function getStudentCatalog(userId: string): Promise<StudentCatalog>
     return totalModulos;
   };
 
-  // Compras ativas do PRÓPRIO usuário — mesma condição de acesso (PAID, não
-  // suspensa, não expirada). Nunca confia em id vindo do cliente.
+  // PRODUTOS comprados — a partir das compras ativas do PRÓPRIO usuário (mesma
+  // condição de acesso: PAID, não suspensa, não expirada). Nunca confia em id
+  // vindo do cliente.
   const purchases = await prisma.purchase.findMany({
     where: { userId, status: "PAID", accessSuspended: false, expiresAt: { gt: now } },
     orderBy: { purchasedAt: "desc" },
@@ -165,14 +166,10 @@ export async function getStudentCatalog(userId: string): Promise<StudentCatalog>
           _count: { select: { productCourses: true } },
         },
       },
-      course: {
-        select: { slug: true, title: true, description: true, thumbnail: true },
-      },
     },
   });
 
   const productMap = new Map<string, CatalogProduct>();
-  const avulsoMap = new Map<string, CatalogAvulso>();
   for (const p of purchases) {
     if (p.product && !productMap.has(p.product.slug)) {
       productMap.set(p.product.slug, {
@@ -184,18 +181,12 @@ export async function getStudentCatalog(userId: string): Promise<StudentCatalog>
           ? await countAllModulos()
           : p.product._count.productCourses,
       });
-    } else if (p.course && !avulsoMap.has(p.course.slug)) {
-      avulsoMap.set(p.course.slug, {
-        slug: p.course.slug,
-        title: p.course.title,
-        description: p.course.description,
-        thumbnail: p.course.thumbnail,
-      });
     }
   }
 
-  // Staff (accessAll sem compras) → vê todos os produtos ativos como preview.
-  if (access.accessAll && productMap.size === 0 && avulsoMap.size === 0) {
+  // Staff / grantsAll sem uma compra de produto atrelada → mostra todos os
+  // produtos ativos como preview/carteira.
+  if (access.accessAll && productMap.size === 0) {
     const all = await prisma.product.findMany({
       where: { isActive: true, deletedAt: null },
       orderBy: { order: "asc" },
@@ -216,8 +207,40 @@ export async function getStudentCatalog(userId: string): Promise<StudentCatalog>
     accessAll: access.accessAll,
     hasAny: true,
     products: [...productMap.values()],
-    avulsos: [...avulsoMap.values()],
+    avulsos: await accessibleAvulsos(access),
   };
+}
+
+/**
+ * Módulos marcados como avulso (soldStandalone) que o aluno ACESSA — por
+ * qualquer via (bundle, Founder/acesso total ou compra avulsa). Sempre
+ * separados: quem tem acesso total vê todos, reforçando a sensação de um
+ * produto mais completo. Recebe o acesso já resolvido pra evitar re-consulta.
+ */
+async function accessibleAvulsos(access: StudentAccess): Promise<CatalogAvulso[]> {
+  if (!access.accessAll && access.courseIds.size === 0) return [];
+  const courses = await prisma.course.findMany({
+    where: {
+      soldStandalone: true,
+      isArchived: false,
+      deletedAt: null,
+      ...(access.accessAll ? {} : { id: { in: [...access.courseIds] } }),
+    },
+    orderBy: { createdAt: "desc" },
+    select: { slug: true, title: true, description: true, thumbnail: true },
+  });
+  return courses.map((c) => ({
+    slug: c.slug,
+    title: c.title,
+    description: c.description,
+    thumbnail: c.thumbnail,
+  }));
+}
+
+/** Versão pública: resolve o acesso e devolve os avulsos acessíveis. */
+export async function getAccessibleAvulsos(userId: string): Promise<CatalogAvulso[]> {
+  const access = await resolveStudentAccess(userId);
+  return accessibleAvulsos(access);
 }
 
 export type OwnedProductModule = {

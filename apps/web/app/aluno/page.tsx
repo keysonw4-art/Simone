@@ -194,7 +194,7 @@ export default async function AlunoHomePage() {
         </div>
       </div>
 
-      {hasAccess && (catalog.products.length > 0 || catalog.avulsos.length > 0) && (
+      {hasAccess && catalog.products.length > 0 && (
         <div>
           <h2 className="font-serif text-3xl text-[var(--color-brand-charcoal)] mb-8 tracking-wide">
             Meus Cursos
@@ -235,7 +235,16 @@ export default async function AlunoHomePage() {
                 </div>
               </Link>
             ))}
+          </div>
+        </div>
+      )}
 
+      {hasAccess && catalog.avulsos.length > 0 && (
+        <div>
+          <h2 className="font-serif text-2xl text-[var(--color-brand-charcoal)] mb-6 tracking-wide">
+            Módulos avulsos
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {catalog.avulsos.map((mod) => (
               <Link
                 key={mod.slug}
