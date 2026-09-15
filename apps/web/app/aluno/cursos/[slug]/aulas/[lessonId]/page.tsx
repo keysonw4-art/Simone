@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@repo/database";
-import { ArrowLeft, PlayCircle, CheckCircle2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { requireLessonAccess } from "@/lib/subscriptionGuard";
 import { ProgressButton } from "@/components/ProgressButton";
 import { FavoriteToggleButton } from "@/components/FavoriteToggleButton";
 import { VimeoPlayer } from "@/components/VimeoPlayer";
+import { LessonExperience } from "@/components/LessonExperience";
 
 export default async function LessonPage({
   params,
@@ -60,10 +61,25 @@ export default async function LessonPage({
     select: { id: true },
   }));
 
+  // Estrutura serializável pro painel (client): seções + aulas + conclusão.
+  const sections = course.modules.map((module) => ({
+    id: module.id,
+    title: module.title,
+    lessons: module.lessons.map((lesson) => ({
+      id: lesson.id,
+      title: lesson.title,
+      completed: !!lesson.progress[0]?.isCompleted,
+    })),
+  }));
+
   return (
-    <div className="flex flex-col lg:flex-row min-h-screen bg-[var(--color-brand-offwhite)] relative z-10">
-      {/* Área Principal (Player de Vídeo) */}
-      <div className="flex-1 overflow-y-auto">
+    <div className="bg-[var(--color-brand-offwhite)] relative z-10">
+      <LessonExperience
+        courseSlug={course.slug}
+        courseTitle={course.title}
+        currentLessonId={currentLesson.id}
+        sections={sections}
+      >
         <div className="max-w-5xl mx-auto px-6 py-8">
           <Link
             href={`/aluno/cursos/${course.slug}`}
@@ -101,74 +117,7 @@ export default async function LessonPage({
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Sidebar Direita (Navegação do Curso) */}
-      <div className="w-full lg:w-96 bg-white border-l border-black/5 overflow-y-auto hidden lg:block h-screen sticky top-0">
-        <div className="p-6 border-b border-black/5 bg-[var(--color-brand-offwhite)]/30">
-          <h3 className="font-serif text-lg text-[var(--color-brand-charcoal)] leading-tight">
-            {course.title}
-          </h3>
-        </div>
-
-        <div className="divide-y divide-black/5">
-          {course.modules.map((module) => (
-            <div key={module.id} className="bg-white">
-              {module.title.trim() !== "" && (
-                <div className="p-4 bg-black/5">
-                  <div className="text-sm font-medium text-[var(--color-brand-charcoal)]">
-                    {module.title}
-                  </div>
-                </div>
-              )}
-
-              <div>
-                {module.lessons.map((lesson, lIndex) => {
-                  const isCurrent = lesson.id === currentLesson?.id;
-                  const lessonCompleted = lesson.progress[0]?.isCompleted;
-
-                  return (
-                    <Link
-                      key={lesson.id}
-                      href={`/aluno/cursos/${course.slug}/aulas/${lesson.id}`}
-                      className={`group flex items-center p-4 transition-colors border-l-2 ${
-                        isCurrent
-                          ? "bg-[var(--color-brand-sage)]/5 border-[var(--color-brand-sage)]"
-                          : "border-transparent hover:bg-black/5"
-                      }`}
-                    >
-                      <div className="mr-4 flex-shrink-0">
-                        {lessonCompleted ? (
-                          <CheckCircle2 className="w-4 h-4 text-[var(--color-brand-sage)]" />
-                        ) : (
-                          <PlayCircle
-                            className={`w-4 h-4 ${
-                              isCurrent
-                                ? "text-[var(--color-brand-sage)]"
-                                : "text-[var(--color-brand-charcoal)]/30 group-hover:text-[var(--color-brand-charcoal)]/50"
-                            }`}
-                          />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div
-                          className={`text-xs truncate ${
-                            isCurrent
-                              ? "text-[var(--color-brand-sage)] font-medium"
-                              : "text-[var(--color-brand-charcoal)]/80 group-hover:text-[var(--color-brand-charcoal)]"
-                          }`}
-                        >
-                          {lIndex + 1}. {lesson.title}
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      </LessonExperience>
     </div>
   );
 }

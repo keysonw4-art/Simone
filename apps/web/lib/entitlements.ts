@@ -220,15 +220,20 @@ export async function getStudentCatalog(userId: string): Promise<StudentCatalog>
   };
 }
 
+export type OwnedProductModule = {
+  slug: string;
+  title: string;
+  description: string | null;
+  thumbnail: string | null;
+  sectionCount: number;
+  lessonsTotal: number;
+  lessonsDone: number;
+  progressPct: number;
+};
+
 export type OwnedProductView = {
   product: { slug: string; name: string; tagline: string | null; description: string | null };
-  modulos: {
-    slug: string;
-    title: string;
-    description: string | null;
-    thumbnail: string | null;
-    sectionCount: number;
-  }[];
+  modulos: OwnedProductModule[];
 };
 
 /**
@@ -267,40 +272,66 @@ export async function getOwnedProductBySlug(
   if (!owns) return null;
 
   // Módulos a exibir: grantsAll/staff → todos ativos; bundle → composição do
-  // produto ∩ o que o aluno realmente pode acessar.
+  // produto ∩ o que o aluno realmente pode acessar (na ORDEM definida no admin).
   const wantAll = product.grantsAll || access.accessAll;
-  const ids = product.productCourses
-    .map((pc) => pc.courseId)
-    .filter((id) => access.courseIds.has(id));
+  const orderedIds = product.productCourses.map((pc) => pc.courseId);
+  const bundleIds = orderedIds.filter((id) => access.courseIds.has(id));
 
-  const courses = wantAll
-    ? await prisma.course.findMany({
-        where: { isArchived: false, deletedAt: null },
-        orderBy: { createdAt: "desc" },
-        select: {
-          slug: true, title: true, description: true, thumbnail: true,
-          _count: { select: { modules: true } },
-        },
-      })
-    : ids.length
+  const courseSelect = {
+    id: true, slug: true, title: true, description: true, thumbnail: true, createdAt: true,
+    modules: {
+      where: { deletedAt: null },
+      select: { lessons: { where: { deletedAt: null }, select: { id: true } } },
+    },
+  } as const;
+
+  const courses =
+    wantAll
       ? await prisma.course.findMany({
-          where: { id: { in: ids }, isArchived: false, deletedAt: null },
-          orderBy: { createdAt: "desc" },
-          select: {
-            slug: true, title: true, description: true, thumbnail: true,
-            _count: { select: { modules: true } },
-          },
+          where: { isArchived: false, deletedAt: null }, select: courseSelect,
         })
-      : [];
+      : bundleIds.length
+        ? await prisma.course.findMany({
+            where: { id: { in: bundleIds }, isArchived: false, deletedAt: null }, select: courseSelect,
+          })
+        : [];
+
+  // Ordena: bundle → pela ordem do ProductCourse (sequência de estudo do admin);
+  // grantsAll → por data de criação (estável).
+  if (wantAll) {
+    courses.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  } else {
+    const pos = new Map(orderedIds.map((id, i) => [id, i]));
+    courses.sort((a, b) => (pos.get(a.id) ?? 0) - (pos.get(b.id) ?? 0));
+  }
+
+  // Progresso por módulo: 1 query pra todas as aulas concluídas do aluno.
+  const allLessonIds = courses.flatMap((c) =>
+    c.modules.flatMap((m) => m.lessons.map((l) => l.id)),
+  );
+  const done = allLessonIds.length
+    ? await prisma.progress.findMany({
+        where: { userId, isCompleted: true, lessonId: { in: allLessonIds } },
+        select: { lessonId: true },
+      })
+    : [];
+  const doneSet = new Set(done.map((p) => p.lessonId));
 
   return {
     product: {
       slug: product.slug, name: product.name,
       tagline: product.tagline, description: product.description,
     },
-    modulos: courses.map((c) => ({
-      slug: c.slug, title: c.title, description: c.description,
-      thumbnail: c.thumbnail, sectionCount: c._count.modules,
-    })),
+    modulos: courses.map((c) => {
+      const lessonIds = c.modules.flatMap((m) => m.lessons.map((l) => l.id));
+      const lessonsDone = lessonIds.filter((id) => doneSet.has(id)).length;
+      return {
+        slug: c.slug, title: c.title, description: c.description, thumbnail: c.thumbnail,
+        sectionCount: c.modules.length,
+        lessonsTotal: lessonIds.length,
+        lessonsDone,
+        progressPct: lessonIds.length ? Math.round((lessonsDone / lessonIds.length) * 100) : 0,
+      };
+    }),
   };
 }

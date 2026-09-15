@@ -22,7 +22,7 @@ export default async function EditarProdutoPage({
 
   const product = await prisma.product.findFirst({
     where: { id, deletedAt: null },
-    include: { productCourses: { select: { courseId: true } } },
+    include: { productCourses: { select: { courseId: true }, orderBy: { order: "asc" } } },
   });
   if (!product) notFound();
 
