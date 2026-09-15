@@ -146,8 +146,10 @@ export async function getStudentCatalog(userId: string): Promise<StudentCatalog>
   let totalModulos = -1;
   const countAllModulos = async (): Promise<number> => {
     if (totalModulos < 0) {
+      // Só módulos "de curso" (não-avulso) — bate com o carrossel, que exclui
+      // os avulsos (esses aparecem na seção de Avulsos).
       totalModulos = await prisma.course.count({
-        where: { isArchived: false, deletedAt: null },
+        where: { isArchived: false, deletedAt: null, soldStandalone: false },
       });
     }
     return totalModulos;
@@ -308,14 +310,17 @@ export async function getOwnedProductBySlug(
     },
   } as const;
 
+  // Carrossel do curso = módulos "de curso" (NÃO avulso). Um módulo marcado
+  // como avulso (soldStandalone) sai daqui e aparece só na seção de Avulsos —
+  // evita a pessoa assistir o mesmo conteúdo no curso e de novo nos avulsos.
   const courses =
     wantAll
       ? await prisma.course.findMany({
-          where: { isArchived: false, deletedAt: null }, select: courseSelect,
+          where: { isArchived: false, deletedAt: null, soldStandalone: false }, select: courseSelect,
         })
       : bundleIds.length
         ? await prisma.course.findMany({
-            where: { id: { in: bundleIds }, isArchived: false, deletedAt: null }, select: courseSelect,
+            where: { id: { in: bundleIds }, isArchived: false, deletedAt: null, soldStandalone: false }, select: courseSelect,
           })
         : [];
 
