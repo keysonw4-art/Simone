@@ -12,7 +12,8 @@ const INK = "#2b2430";
 const MUTED = "#6b6675";
 
 const SERIF = "Georgia, 'Times New Roman', serif";
-const SANS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif";
+const SANS =
+  "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif";
 
 /** Escapa texto vindo do usuário (nome) antes de interpolar no HTML. */
 export function escapeHtml(input: string): string {
@@ -41,7 +42,11 @@ export function formatDate(d: Date): string {
 }
 
 /** Botão de ação (CTA) no estilo da marca. */
-function button(href: string, label: string, tone: "sage" | "gold" = "sage"): string {
+function button(
+  href: string,
+  label: string,
+  tone: "sage" | "gold" = "sage",
+): string {
   const bg = tone === "gold" ? GOLD : SAGE;
   return `
   <table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0;">
@@ -98,8 +103,7 @@ export function baseLayout(opts: {
         <tr>
           <td style="padding:24px 40px;border-top:1px solid rgba(0,0,0,0.06);">
             <p style="margin:0;font-family:${SANS};font-size:11px;line-height:1.6;color:${MUTED};">
-              Você recebeu este e-mail porque tem uma conta na plataforma da Simone Mendes.
-              <br>© ${year} Simone Mendes — Personal Organizer.
+              © ${year} Simone Mendes — Personal Organizer.
             </p>
           </td>
         </tr>
@@ -113,36 +117,43 @@ export function baseLayout(opts: {
 
 type Built = { subject: string; html: string };
 
-export function passwordResetTemplate(name: string | null, link: string): Built {
-  const hi = name ? escapeHtml(name.split(" ")[0]!) : "Olá";
+function greeting(name: string | null): string {
+  const firstName = name?.trim().split(/\s+/)[0];
+  return firstName ? `Olá, ${escapeHtml(firstName)}.` : "Olá.";
+}
+
+export function passwordResetTemplate(
+  name: string | null,
+  link: string,
+): Built {
+  const hello = greeting(name);
   return {
-    subject: "Redefinição de senha — Simone Mendes",
+    subject: "Solicitação de redefinição de senha — Simone Mendes",
     html: baseLayout({
-      preview: "Link para criar uma nova senha (válido por 1 hora).",
-      heading: "Redefinir sua senha",
+      preview: "Redefina sua senha por meio de um link válido por 1 hora.",
+      heading: "Redefinição de senha",
       bodyHtml: `
-        <p style="margin:0 0 16px;">${hi}, recebemos um pedido para redefinir a senha da sua conta.</p>
-        <p style="margin:0 0 8px;">Clique no botão abaixo para criar uma nova senha. O link é válido por <strong>1 hora</strong>.</p>
-        ${button(link, "Criar nova senha")}
-        <p style="margin:0 0 8px;color:${MUTED};font-size:13px;">Se você não pediu isso, pode ignorar este e-mail com segurança — sua senha atual continua valendo.</p>
-        <p style="margin:16px 0 0;color:${MUTED};font-size:12px;word-break:break-all;">Se o botão não funcionar, copie e cole este endereço no navegador:<br>${link}</p>
+        <p style="margin:0 0 16px;">${hello}</p>
+        <p style="margin:0 0 8px;">Recebemos uma solicitação para redefinir a senha da sua conta. Use o botão abaixo para definir uma nova senha. Por segurança, este link expira em <strong>1 hora</strong>.</p>
+        ${button(link, "Redefinir senha")}
+        <p style="margin:0;color:${MUTED};font-size:13px;">Caso não reconheça esta solicitação, nenhuma ação é necessária. Sua senha permanecerá inalterada.</p>
       `,
     }),
   };
 }
 
 export function welcomeTemplate(name: string | null, link: string): Built {
-  const hi = name ? escapeHtml(name.split(" ")[0]!) : "Olá";
+  const hello = greeting(name);
   return {
-    subject: "Bem-vinda(o) à plataforma da Simone Mendes",
+    subject: "Boas-vindas à plataforma Simone Mendes",
     html: baseLayout({
-      preview: "Sua conta foi criada. Acesse a área do aluno.",
+      preview: "Sua conta na plataforma Simone Mendes está pronta.",
       heading: "Sua conta está pronta",
       bodyHtml: `
-        <p style="margin:0 0 16px;">${hi}, que bom ter você aqui! Sua conta foi criada com sucesso.</p>
-        <p style="margin:0 0 8px;">Na sua área você acompanha seus cursos, seu progresso e seus certificados. É só entrar:</p>
-        ${button(link, "Acessar minha área")}
-        <p style="margin:0;color:${MUTED};font-size:13px;">Qualquer dúvida, é só responder este e-mail que a gente te ajuda.</p>
+        <p style="margin:0 0 16px;">${hello}</p>
+        <p style="margin:0 0 8px;">Sua conta foi criada com sucesso. Na área do aluno, você poderá acessar seus cursos, acompanhar seu progresso e consultar seus certificados.</p>
+        ${button(link, "Acessar área do aluno")}
+        <p style="margin:0;color:${MUTED};font-size:13px;">Caso precise de suporte, responda a este e-mail. Nossa equipe está à disposição.</p>
       `,
     }),
   };
@@ -155,15 +166,16 @@ export function purchaseConfirmationTemplate(params: {
   expiresAt: Date;
   link: string;
 }): Built {
-  const hi = params.name ? escapeHtml(params.name.split(" ")[0]!) : "Olá";
+  const hello = greeting(params.name);
   const item = escapeHtml(params.itemName);
   return {
-    subject: `Compra confirmada — ${params.itemName}`,
+    subject: `Confirmação de compra — ${params.itemName}`,
     html: baseLayout({
-      preview: `Seu acesso a ${params.itemName} já está liberado.`,
+      preview: "Pagamento confirmado. Seu acesso já está disponível.",
       heading: "Compra confirmada",
       bodyHtml: `
-        <p style="margin:0 0 16px;">${hi}, sua compra foi confirmada e seu acesso já está liberado. Bons estudos!</p>
+        <p style="margin:0 0 16px;">${hello}</p>
+        <p style="margin:0 0 16px;">Confirmamos o pagamento de sua compra. O acesso ao conteúdo já está disponível na área do aluno.</p>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px;border:1px solid rgba(0,0,0,0.08);border-radius:8px;">
           <tr><td style="padding:14px 18px;border-bottom:1px solid rgba(0,0,0,0.06);font-family:${SANS};font-size:13px;color:${MUTED};">Curso</td>
               <td style="padding:14px 18px;border-bottom:1px solid rgba(0,0,0,0.06);font-family:${SANS};font-size:14px;color:${INK};text-align:right;font-weight:600;">${item}</td></tr>
@@ -172,8 +184,8 @@ export function purchaseConfirmationTemplate(params: {
           <tr><td style="padding:14px 18px;font-family:${SANS};font-size:13px;color:${MUTED};">Acesso até</td>
               <td style="padding:14px 18px;font-family:${SANS};font-size:14px;color:${INK};text-align:right;">${formatDate(params.expiresAt)}</td></tr>
         </table>
-        ${button(params.link, "Começar a assistir")}
-        <p style="margin:0;color:${MUTED};font-size:12px;">O recibo do pagamento é enviado separadamente pela Stripe.</p>
+        ${button(params.link, "Acessar área do aluno")}
+        <p style="margin:0;color:${MUTED};font-size:13px;">Desejamos uma excelente experiência de aprendizado.</p>
       `,
     }),
   };
@@ -186,19 +198,19 @@ export function expiryWarningTemplate(params: {
   daysLeft: number;
   link: string;
 }): Built {
-  const hi = params.name ? escapeHtml(params.name.split(" ")[0]!) : "Olá";
+  const hello = greeting(params.name);
   const item = escapeHtml(params.itemName);
   const days = params.daysLeft === 1 ? "1 dia" : `${params.daysLeft} dias`;
   return {
-    subject: `Seu acesso expira em ${days} — ${params.itemName}`,
+    subject: `Acesso disponível até ${formatDate(params.expiresAt)} — ${params.itemName}`,
     html: baseLayout({
-      preview: `Seu acesso a ${params.itemName} expira em ${formatDate(params.expiresAt)}.`,
-      heading: "Seu acesso está perto de expirar",
+      preview: `Informações sobre o período de acesso a ${params.itemName}.`,
+      heading: "Informação sobre seu acesso",
       bodyHtml: `
-        <p style="margin:0 0 16px;">${hi}, passando para avisar: seu acesso a <strong>${item}</strong> expira em <strong>${days}</strong>, no dia ${formatDate(params.expiresAt)}.</p>
-        <p style="margin:0 0 8px;">Se quiser aproveitar o conteúdo antes disso, é um bom momento para revisar suas aulas e baixar seus materiais.</p>
-        ${button(params.link, "Acessar meus cursos", "gold")}
-        <p style="margin:0;color:${MUTED};font-size:13px;">Quer renovar ou saber sobre outros cursos? Responda este e-mail que a gente te orienta.</p>
+        <p style="margin:0 0 16px;">${hello}</p>
+        <p style="margin:0 0 8px;">Seu acesso a <strong>${item}</strong> ficará disponível até <strong>${formatDate(params.expiresAt)}</strong>. Restam <strong>${days}</strong> para revisar as aulas e baixar os materiais disponíveis.</p>
+        ${button(params.link, "Acessar cursos", "gold")}
+        <p style="margin:0;color:${MUTED};font-size:13px;">Para informações sobre renovação, responda a este e-mail. Nossa equipe está à disposição.</p>
       `,
     }),
   };
