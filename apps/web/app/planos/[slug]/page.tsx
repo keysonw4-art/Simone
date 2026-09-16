@@ -21,10 +21,12 @@ function certLabel(t: string | null): string | null {
 
 export default async function CursoDetalhePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ checkout?: string; erro?: string }>;
 }) {
-  const { slug } = await params;
+  const [{ slug }, sp] = await Promise.all([params, searchParams]);
 
   const product = await prisma.product.findFirst({
     where: { slug, isActive: true, deletedAt: null },
@@ -33,7 +35,12 @@ export default async function CursoDetalhePage({
         orderBy: { order: "asc" },
         select: {
           course: {
-            select: { id: true, title: true, description: true, workloadHours: true },
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              workloadHours: true,
+            },
           },
         },
       },
@@ -50,14 +57,41 @@ export default async function CursoDetalhePage({
       ? access.grantsAll
       : access.grantsAll ||
         (product.productCourses.length > 0 &&
-          product.productCourses.every((pc) => access.courseIds.has(pc.course.id)))
+          product.productCourses.every((pc) =>
+            access.courseIds.has(pc.course.id),
+          ))
     : false;
 
-  const soldOut = product.maxSeats != null && product.seatsSold >= product.maxSeats;
+  const soldOut =
+    product.maxSeats != null && product.seatsSold >= product.maxSeats;
   const seatsLeft =
-    product.maxSeats != null ? Math.max(0, product.maxSeats - product.seatsSold) : null;
+    product.maxSeats != null
+      ? Math.max(0, product.maxSeats - product.seatsSold)
+      : null;
   const cert = certLabel(product.certificateType);
   const installment = Math.round(product.priceCents / 10);
+  const banner =
+    sp.checkout === "cancelado"
+      ? {
+          tone: "neutro" as const,
+          text: "Compra cancelada. Nenhuma cobrança foi realizada.",
+        }
+      : sp.erro === "pagamento"
+        ? {
+            tone: "erro" as const,
+            text: "Não foi possível iniciar o pagamento. Nenhuma cobrança foi realizada. Tente novamente em instantes.",
+          }
+        : sp.erro === "preco"
+          ? {
+              tone: "erro" as const,
+              text: "O pagamento deste curso está temporariamente indisponível. Tente novamente mais tarde.",
+            }
+          : sp.erro === "esgotado"
+            ? {
+                tone: "erro" as const,
+                text: "As vagas deste curso se esgotaram.",
+              }
+            : null;
 
   return (
     <div className="min-h-screen bg-[var(--color-brand-offwhite)] py-16 md:py-24 px-6">
@@ -68,6 +102,19 @@ export default async function CursoDetalhePage({
         >
           <ArrowLeft className="w-3.5 h-3.5" /> Todos os cursos
         </Link>
+
+        {banner && (
+          <div
+            role="status"
+            className={`mb-8 rounded-sm border px-5 py-4 text-sm text-center ${
+              banner.tone === "erro"
+                ? "border-red-200 bg-red-50 text-red-700"
+                : "border-black/10 bg-white text-[var(--color-brand-charcoal)]/70"
+            }`}
+          >
+            {banner.text}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-10 items-start">
           {/* Conteúdo */}
@@ -118,12 +165,17 @@ export default async function CursoDetalhePage({
             {product.grantsAll ? (
               <div className="bg-white border border-black/5 rounded-lg p-6 text-sm text-[var(--color-brand-charcoal)]/80 flex items-center gap-3">
                 <PlayCircle className="w-5 h-5 text-[var(--color-brand-sage)] flex-shrink-0" />
-                Acesso a <strong className="mx-1">todos os módulos</strong> da plataforma, inclusive os que forem lançados durante o seu acesso.
+                Acesso a <strong className="mx-1">todos os módulos</strong> da
+                plataforma, inclusive os que forem lançados durante o seu
+                acesso.
               </div>
             ) : product.productCourses.length > 0 ? (
               <div className="bg-white border border-black/5 rounded-lg divide-y divide-black/5 overflow-hidden">
                 {product.productCourses.map((pc) => (
-                  <div key={pc.course.id} className="flex items-start gap-4 p-5">
+                  <div
+                    key={pc.course.id}
+                    className="flex items-start gap-4 p-5"
+                  >
                     <div className="w-9 h-9 rounded-sm bg-[var(--color-brand-sage)]/10 text-[var(--color-brand-sage)] flex items-center justify-center flex-shrink-0">
                       <PlayCircle className="w-4 h-4" />
                     </div>
@@ -132,7 +184,8 @@ export default async function CursoDetalhePage({
                         {pc.course.title}
                         {pc.course.workloadHours != null && (
                           <span className="text-[var(--color-brand-charcoal)]/40 font-normal">
-                            {" "}· {pc.course.workloadHours}h
+                            {" "}
+                            · {pc.course.workloadHours}h
                           </span>
                         )}
                       </div>
@@ -205,7 +258,9 @@ export default async function CursoDetalhePage({
                   {soldOut ? "Esgotado" : "Em breve"}
                 </button>
               ) : (
-                <form action={startProductCheckoutAction.bind(null, product.id)}>
+                <form
+                  action={startProductCheckoutAction.bind(null, product.id)}
+                >
                   <button
                     type="submit"
                     className={`w-full px-6 py-4 text-xs font-semibold uppercase tracking-[0.2em] rounded-sm transition-colors ${

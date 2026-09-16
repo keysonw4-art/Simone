@@ -45,14 +45,33 @@ export default async function PlanosPage({
 
   const banner =
     sp?.checkout === "cancelado"
-      ? { tone: "neutro" as const, text: "Compra cancelada. Você pode voltar quando quiser." }
+      ? {
+          tone: "neutro" as const,
+          text: "Compra cancelada. Você pode voltar quando quiser.",
+        }
       : sp?.erro === "esgotado"
         ? { tone: "erro" as const, text: "As vagas deste curso se esgotaram." }
         : sp?.erro === "indisponivel"
-          ? { tone: "erro" as const, text: "Este curso ainda não está disponível para compra." }
-          : sp?.erro === "checkout"
-            ? { tone: "erro" as const, text: "Não foi possível iniciar o checkout. Tente novamente." }
-            : null;
+          ? {
+              tone: "erro" as const,
+              text: "Este curso ainda não está disponível para compra.",
+            }
+          : sp?.erro === "preco"
+            ? {
+                tone: "erro" as const,
+                text: "O pagamento deste curso está temporariamente indisponível.",
+              }
+            : sp?.erro === "pagamento" || sp?.erro === "checkout"
+              ? {
+                  tone: "erro" as const,
+                  text: "Não foi possível iniciar o pagamento. Nenhuma cobrança foi realizada. Tente novamente em instantes.",
+                }
+              : sp?.erro === "limite"
+                ? {
+                    tone: "erro" as const,
+                    text: "Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente novamente.",
+                  }
+                : null;
 
   return (
     <div className="min-h-screen bg-[var(--color-brand-offwhite)] py-16 md:py-24 px-6">
@@ -73,9 +92,12 @@ export default async function PlanosPage({
             Escolha o seu caminho.
           </h1>
           <p className="text-base text-[var(--color-brand-charcoal)]/70 font-light leading-relaxed">
-            Compra única com acesso por prazo. Sem mensalidade. Também é possível
-            comprar módulos avulsos na{" "}
-            <Link href="/avulsos" className="text-[var(--color-brand-sage)] underline underline-offset-2">
+            Compra única com acesso por prazo. Sem mensalidade. Também é
+            possível comprar módulos avulsos na{" "}
+            <Link
+              href="/avulsos"
+              className="text-[var(--color-brand-sage)] underline underline-offset-2"
+            >
               página de avulsos
             </Link>
             .
@@ -105,10 +127,11 @@ export default async function PlanosPage({
             {products.map((p) => {
               const cert = certLabel(p.certificateType);
               const owned = owns(p);
-              const soldOut =
-                p.maxSeats != null && p.seatsSold >= p.maxSeats;
+              const soldOut = p.maxSeats != null && p.seatsSold >= p.maxSeats;
               const seatsLeft =
-                p.maxSeats != null ? Math.max(0, p.maxSeats - p.seatsSold) : null;
+                p.maxSeats != null
+                  ? Math.max(0, p.maxSeats - p.seatsSold)
+                  : null;
 
               return (
                 <article
@@ -170,7 +193,9 @@ export default async function PlanosPage({
 
                     {seatsLeft != null && !owned && (
                       <p className="text-[11px] uppercase tracking-widest text-[var(--color-brand-gold)] mb-4">
-                        {soldOut ? "Vagas esgotadas" : `${seatsLeft} vagas restantes`}
+                        {soldOut
+                          ? "Vagas esgotadas"
+                          : `${seatsLeft} vagas restantes`}
                       </p>
                     )}
 
@@ -203,8 +228,8 @@ export default async function PlanosPage({
         )}
 
         <p className="text-center text-xs text-[var(--color-brand-charcoal)]/50 mt-12 max-w-2xl mx-auto leading-relaxed">
-          Pagamento único e seguro pela Stripe. O acesso vale pelo prazo do curso
-          e o sistema avisa antes de expirar.
+          Pagamento único e seguro pela Stripe. O acesso vale pelo prazo do
+          curso e o sistema avisa antes de expirar.
         </p>
       </div>
     </div>

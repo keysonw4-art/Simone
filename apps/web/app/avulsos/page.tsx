@@ -12,7 +12,13 @@ function formatBRL(cents: number): string {
   }).format(cents / 100);
 }
 
-const CAT_ORDER = ["PRATICO", "TEORICO", "ESPECIALIZADO", "LINHA_DOMESTICA", "FORMACAO"];
+const CAT_ORDER = [
+  "PRATICO",
+  "TEORICO",
+  "ESPECIALIZADO",
+  "LINHA_DOMESTICA",
+  "FORMACAO",
+];
 const CAT_LABELS: Record<string, string> = {
   PRATICO: "Práticos",
   TEORICO: "Teóricos",
@@ -63,12 +69,31 @@ export default async function AvulsosPage({
 
   const banner =
     sp?.checkout === "cancelado"
-      ? "Compra cancelada. Você pode voltar quando quiser."
+      ? {
+          tone: "neutro" as const,
+          text: "Compra cancelada. Nenhuma cobrança foi realizada.",
+        }
       : sp?.erro === "indisponivel"
-        ? "Este módulo ainda não está disponível para compra."
-        : sp?.erro === "checkout"
-          ? "Não foi possível iniciar o checkout. Tente novamente."
-          : null;
+        ? {
+            tone: "erro" as const,
+            text: "Este módulo ainda não está disponível para compra.",
+          }
+        : sp?.erro === "preco"
+          ? {
+              tone: "erro" as const,
+              text: "O pagamento deste módulo está temporariamente indisponível.",
+            }
+          : sp?.erro === "pagamento" || sp?.erro === "checkout"
+            ? {
+                tone: "erro" as const,
+                text: "Não foi possível iniciar o pagamento. Nenhuma cobrança foi realizada. Tente novamente em instantes.",
+              }
+            : sp?.erro === "limite"
+              ? {
+                  tone: "erro" as const,
+                  text: "Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente novamente.",
+                }
+              : null;
 
   return (
     <div className="min-h-screen bg-[var(--color-brand-offwhite)] py-16 md:py-24 px-6">
@@ -90,7 +115,10 @@ export default async function AvulsosPage({
           </h1>
           <p className="text-base text-[var(--color-brand-charcoal)]/70 font-light leading-relaxed">
             Compre só o módulo que você quer, com 12 meses de acesso. Ou veja os{" "}
-            <Link href="/planos" className="text-[var(--color-brand-sage)] underline underline-offset-2">
+            <Link
+              href="/planos"
+              className="text-[var(--color-brand-sage)] underline underline-offset-2"
+            >
               cursos completos
             </Link>
             .
@@ -98,8 +126,15 @@ export default async function AvulsosPage({
         </header>
 
         {banner && (
-          <div className="max-w-2xl mx-auto mb-10 rounded-sm border border-black/10 bg-white px-5 py-4 text-sm text-center text-[var(--color-brand-charcoal)]/70">
-            {banner}
+          <div
+            role="status"
+            className={`max-w-2xl mx-auto mb-10 rounded-sm border px-5 py-4 text-sm text-center ${
+              banner.tone === "erro"
+                ? "border-red-200 bg-red-50 text-red-700"
+                : "border-black/10 bg-white text-[var(--color-brand-charcoal)]/70"
+            }`}
+          >
+            {banner.text}
           </div>
         )}
 
@@ -154,7 +189,12 @@ export default async function AvulsosPage({
                               Criar conta
                             </Link>
                           ) : buyable ? (
-                            <form action={startModuleCheckoutAction.bind(null, m.id)}>
+                            <form
+                              action={startModuleCheckoutAction.bind(
+                                null,
+                                m.id,
+                              )}
+                            >
                               <button
                                 type="submit"
                                 className="w-full px-5 py-3 text-[11px] font-semibold uppercase tracking-widest rounded-sm bg-[var(--color-brand-sage)] text-white hover:bg-[var(--color-brand-charcoal)] transition-colors"
