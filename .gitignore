@@ -36,3 +36,14 @@ yarn-error.log*
 # ui
 dist/
 scratch_*.mjs
+
+# Config local de ferramentas
+.claude/
+.agents/
+.codex/
+.vercel/
+
+# Relatorios internos de seguranca (nao publicar)
+AUDITORIA-SEGURANCA-*.md
+SEGURANCA-PREPRODUCAO-*.md
+educacao-digital.md

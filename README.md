@@ -1,58 +1,54 @@
-# Turborepo Tailwind CSS starter
+# Simone Educação Digital
 
-This Turborepo starter is maintained by the Turborepo core team.
+Plataforma para venda e consumo de cursos de organização. O produto reúne site público, área do aluno e painel administrativo em um único monorepo.
 
-## Using this example
+## Funcionalidades
 
-Run the following command:
+1. Catálogo público de cursos e produtos
+2. Cadastro, autenticação e recuperação de senha
+3. Pagamentos e assinaturas com Stripe
+4. Área do aluno com cursos, aulas e materiais
+5. Progresso, favoritos e certificados
+6. Suporte por chamados e mensagens
+7. Painel administrativo para conteúdo, alunos e produtos
+8. Armazenamento privado de arquivos no Supabase
+9. Vídeos protegidos com Vimeo
+10. Auditoria e registros operacionais
 
-```sh
-npx create-turbo@latest -e with-tailwind
+## Arquitetura
+
+O monorepo separa o portal administrativo em `apps/admin`, a experiência pública e do aluno em `apps/web` e os recursos compartilhados em `packages`.
+
+Autenticação, banco, envio de email, armazenamento e componentes visuais possuem pacotes próprios. As aplicações consomem esses módulos por contratos compartilhados, reduzindo duplicação e mantendo os limites entre interface e infraestrutura.
+
+## Tecnologias
+
+Next.js 16, React 19, TypeScript, Auth.js, Prisma, PostgreSQL, Supabase Storage, Stripe, Vimeo, Resend, Tailwind CSS e Turborepo.
+
+## Executar localmente
+
+1. Instale o Node.js 20 ou superior
+2. Execute `npm install` na raiz
+3. Copie `.env.example` para `.env`
+4. Preencha as variáveis necessárias
+5. Execute `npm run dev`
+6. Acesse o painel em `http://localhost:3000`
+7. Acesse o site em `http://localhost:3001`
+
+## Verificação
+
+```bash
+npm run lint
+npm run test:security
+npm run build
 ```
 
-## What's inside?
+A suíte atual cobre autenticação, autorização, limitação de requisições, pagamentos, arquivos privados, certificados e tarefas agendadas.
 
-This Turborepo includes the following packages/apps:
+## Status
 
-### Apps and Packages
+MVP funcional preparado para demonstração técnica. Integrações externas exigem credenciais próprias e não estão incluídas no repositório.
 
-- `docs`: a [Next.js](https://nextjs.org/) app with [Tailwind CSS](https://tailwindcss.com/)
-- `web`: another [Next.js](https://nextjs.org/) app with [Tailwind CSS](https://tailwindcss.com/)
-- `ui`: a stub React component library with [Tailwind CSS](https://tailwindcss.com/) shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+## Uso do código
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Building packages/ui
-
-This example is set up to produce compiled styles for `ui` components into the `dist` directory. The component `.tsx` files are consumed by the Next.js apps directly using `transpilePackages` in `next.config.ts`. This was chosen for several reasons:
-
-- Make sharing one `tailwind.config.ts` to apps and packages as easy as possible.
-- Make package compilation simple by only depending on the Next.js Compiler and `tailwindcss`.
-- Ensure Tailwind classes do not overwrite each other. The `ui` package uses a `ui-` prefix for it's classes.
-- Maintain clear package export boundaries.
-
-Another option is to consume `packages/ui` directly from source without building. If using this option, you will need to update the `tailwind.config.ts` in your apps to be aware of your package locations, so it can find all usages of the `tailwindcss` class names for CSS compilation.
-
-For example, in [tailwind.config.ts](packages/tailwind-config/tailwind.config.ts):
-
-```js
-  content: [
-    // app content
-    `src/**/*.{js,ts,jsx,tsx}`,
-    // include packages if not transpiling
-    "../../packages/ui/*.{js,ts,jsx,tsx}",
-  ],
-```
-
-If you choose this strategy, you can remove the `tailwindcss` and `autoprefixer` dependencies from the `ui` package.
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [Tailwind CSS](https://tailwindcss.com/) for styles
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
+Código disponibilizado para avaliação técnica. Todos os direitos reservados.
